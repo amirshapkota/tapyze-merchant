@@ -3,8 +3,9 @@ import { StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 
-// Import merchant screens
+// Import screens
 import WelcomeScreen from './app/screens/WelcomeScreen';
+import AuthScreen from './app/screens/AuthScreen';
 
 // Create navigation stack
 const Stack = createStackNavigator();
@@ -15,7 +16,7 @@ const App = () => {
       <StatusBar backgroundColor="#ffffff" barStyle="dark-content" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="MerchantWelcome" component={WelcomeScreen} />
-        {/* <Stack.Screen name="MerchantAuth" component={AuthScreen} /> */}
+        <Stack.Screen name="MerchantAuth" component={AuthScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
