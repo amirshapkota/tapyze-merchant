@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import styles from '../styles/AuthScreenStyles';
 
 const AuthScreen = ({ navigation }) => {
-  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [isLoginMode, setIsLoginMode] = useState(false);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [password, setPassword] = useState('');
@@ -31,14 +31,24 @@ const AuthScreen = ({ navigation }) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
   const [isFormValid, setIsFormValid] = useState(false);
+  const [isInputTouched, setIsInputTouched] = useState({
+    email: false,
+    password: false,
+    businessName: false,
+    confirmPassword: false
+  });
 
-  // Validation effects
+  // Validation effects - only run if fields have been touched
   useEffect(() => {
-    validateForm();
-  }, [email, password, confirmPassword, businessName, isLoginMode]);
+    if (Object.values(isInputTouched).some(field => field)) {
+      validateForm();
+    }
+  }, [email, password, confirmPassword, businessName, isLoginMode, isInputTouched]);
   
   // Email validation
   const validateEmail = (text) => {
+    if (!isInputTouched.email) return true;
+    
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!text) {
       setEmailError('Email is required');
@@ -54,6 +64,8 @@ const AuthScreen = ({ navigation }) => {
 
   // Password validation
   const validatePassword = (text) => {
+    if (!isInputTouched.password) return true;
+    
     if (!text) {
       setPasswordError('Password is required');
       return false;
@@ -68,18 +80,21 @@ const AuthScreen = ({ navigation }) => {
 
   // Business name validation
   const validateBusinessName = (text) => {
-    if (!isLoginMode && !text) {
-      setBusinessNameError('Business name is required');
-      return false;
-    } else {
-      setBusinessNameError('');
-      return true;
+    if (!isLoginMode && isInputTouched.businessName) {
+      if (!text) {
+        setBusinessNameError('Business name is required');
+        return false;
+      } else {
+        setBusinessNameError('');
+        return true;
+      }
     }
+    return true;
   };
 
   // Confirm password validation
   const validateConfirmPassword = (text) => {
-    if (!isLoginMode) {
+    if (!isLoginMode && isInputTouched.confirmPassword) {
       if (!text) {
         setConfirmPasswordError('Please confirm your password');
         return false;
@@ -119,9 +134,24 @@ const AuthScreen = ({ navigation }) => {
     setBusinessNameError('');
     setConfirmPassword('');
     setConfirmPasswordError('');
+    // Reset touched states
+    setIsInputTouched({
+      email: false,
+      password: false,
+      businessName: false,
+      confirmPassword: false
+    });
   };
 
   const handleSubmit = () => {
+    // Mark all fields as touched for validation
+    setIsInputTouched({
+      email: true,
+      password: true,
+      businessName: true,
+      confirmPassword: true
+    });
+    
     // Validate form again before submission
     const isEmailValid = validateEmail(email);
     const isPasswordValid = validatePassword(password);
@@ -195,7 +225,10 @@ const AuthScreen = ({ navigation }) => {
                     value={businessName}
                     onChangeText={(text) => {
                       setBusinessName(text);
-                      validateBusinessName(text);
+                    }}
+                    onBlur={() => {
+                      setIsInputTouched({...isInputTouched, businessName: true});
+                      validateBusinessName(businessName);
                     }}
                     autoCapitalize="words"
                   />
@@ -213,7 +246,10 @@ const AuthScreen = ({ navigation }) => {
                   value={email}
                   onChangeText={(text) => {
                     setEmail(text);
-                    validateEmail(text);
+                  }}
+                  onBlur={() => {
+                    setIsInputTouched({...isInputTouched, email: true});
+                    validateEmail(email);
                   }}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -232,7 +268,10 @@ const AuthScreen = ({ navigation }) => {
                     value={password}
                     onChangeText={(text) => {
                       setPassword(text);
-                      validatePassword(text);
+                    }}
+                    onBlur={() => {
+                      setIsInputTouched({...isInputTouched, password: true});
+                      validatePassword(password);
                     }}
                     secureTextEntry={!isPasswordVisible}
                   />
@@ -262,7 +301,10 @@ const AuthScreen = ({ navigation }) => {
                       value={confirmPassword}
                       onChangeText={(text) => {
                         setConfirmPassword(text);
-                        validateConfirmPassword(text);
+                      }}
+                      onBlur={() => {
+                        setIsInputTouched({...isInputTouched, confirmPassword: true});
+                        validateConfirmPassword(confirmPassword);
                       }}
                       secureTextEntry={!isConfirmPasswordVisible}
                     />
@@ -292,10 +334,10 @@ const AuthScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={[
                   styles.submitButton,
-                  !isFormValid && styles.disabledButton
+                  Object.values(isInputTouched).some(field => field) && !isFormValid && styles.disabledButton
                 ]}
                 onPress={handleSubmit}
-                disabled={!isFormValid}
+                disabled={Object.values(isInputTouched).some(field => field) && !isFormValid}
               >
                 <Text style={styles.submitButtonText}>
                   {isLoginMode ? 'Sign In' : 'Create Account'}
