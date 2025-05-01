@@ -1,5 +1,6 @@
 import { StyleSheet } from "react-native";
 
+// Styles for the Dashboard Screen
 const styles = StyleSheet.create({
   container: {
     flex: 1,
