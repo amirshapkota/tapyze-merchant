@@ -50,42 +50,6 @@ const merchantPromotions = [
   }
 ];
 
-// Sample data for merchant terminals
-const merchantTerminals = [
-  {
-    id: '1',
-    name: 'Main Counter',
-    status: 'online',
-    lastSynced: '2 mins ago',
-    batteryLevel: 85,
-    transactionCount: 42
-  },
-  {
-    id: '2',
-    name: 'Register 2',
-    status: 'online',
-    lastSynced: '5 mins ago',
-    batteryLevel: 67,
-    transactionCount: 28
-  },
-  {
-    id: '3',
-    name: 'Mobile Terminal',
-    status: 'offline',
-    lastSynced: '2 hours ago',
-    batteryLevel: 12,
-    transactionCount: 15
-  },
-  {
-    id: '4',
-    name: 'Checkout 3',
-    status: 'online',
-    lastSynced: '1 min ago',
-    batteryLevel: 92,
-    transactionCount: 31
-  }
-];
-
 const DashboardScreen = () => {
   // Get the navigation object
   const navigation = useNavigation();
@@ -100,8 +64,6 @@ const DashboardScreen = () => {
   // Add state for modals
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
-  const [showTerminalSettingsModal, setShowTerminalSettingsModal] = useState(false);
-  const [selectedTerminal, setSelectedTerminal] = useState(null);
 
   // Calculate average transaction value
   const averageTransaction = totalRevenue / transactionCount;
@@ -121,31 +83,20 @@ const DashboardScreen = () => {
     navigation.navigate('TransactionHistory');
   };
 
-  // Navigate to terminal management screen
-  const navigateToTerminalManagement = () => {
-    navigation.navigate('TerminalManagement');
-  };
-
   // Navigate to create new payment screen
   const navigateToCreatePayment = () => {
     navigation.navigate('CreatePayment');
   };
 
-  // Navigate to refund screen
-  const navigateToRefund = () => {
-    navigation.navigate('Refund');
+  // Navigate to withdraw screen
+  const navigateToWithdraw = () => {
+    navigation.navigate('Withdraw');
   };
 
   // Handle transaction selection for details modal
   const handleTransactionSelect = (transaction) => {
     setSelectedTransaction(transaction);
     setShowTransactionModal(true);
-  };
-
-  // Handle terminal selection for settings modal
-  const handleTerminalSelect = (terminal) => {
-    setSelectedTerminal(terminal);
-    setShowTerminalSettingsModal(true);
   };
 
   const renderPromotion = ({ item }) => (
@@ -294,10 +245,10 @@ const DashboardScreen = () => {
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.actionButton, styles.secondaryButton]}
-              onPress={navigateToRefund}
+              onPress={navigateToWithdraw}
             >
-              <Ionicons name="return-down-back-outline" size={20} color="#FFF" />
-              <Text style={styles.actionButtonText}>Refund</Text>
+              <Ionicons name="wallet-outline" size={20} color="#FFF" />
+              <Text style={styles.actionButtonText}>Withdraw</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -317,30 +268,9 @@ const DashboardScreen = () => {
           
           <TouchableOpacity style={styles.quickActionItem}>
             <View style={styles.quickActionIcon}>
-              <Ionicons name="receipt-outline" size={24} color="#ed7b0e" />
-            </View>
-            <Text style={styles.quickActionTitle}>Invoice</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.quickActionItem}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="time-outline" size={24} color="#ed7b0e" />
-            </View>
-            <Text style={styles.quickActionTitle}>Instant Payout</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.quickActionItem}>
-            <View style={styles.quickActionIcon}>
               <Ionicons name="stats-chart-outline" size={24} color="#ed7b0e" />
             </View>
             <Text style={styles.quickActionTitle}>Analytics</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.quickActionItem}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="people-outline" size={24} color="#ed7b0e" />
-            </View>
-            <Text style={styles.quickActionTitle}>Customers</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.quickActionItem}>
@@ -351,63 +281,28 @@ const DashboardScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Primary Terminal Section */}
+        {/* NFC Terminal Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Primary Terminal</Text>
-          <TouchableOpacity onPress={navigateToTerminalManagement}>
-            <Text style={styles.seeAllText}>Manage</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>NFC Scanner</Text>
         </View>
 
         <View style={styles.cardContainer}>
-          <TouchableOpacity style={styles.terminalCard} onPress={navigateToTerminalManagement}>
+          <TouchableOpacity style={styles.terminalCard}>
             <View style={styles.cardHeader}>
               <View style={styles.cardLogo}>
                 <Text style={styles.cardLogoText}>TAPYZE</Text>
               </View>
-              <Text style={styles.cardType}>POS TERMINAL</Text>
+              <Text style={styles.cardType}>NFC SCANNER</Text>
             </View>
             <View style={styles.cardContent}>
-              <Text style={styles.cardName}>Main Counter Terminal</Text>
-              <Text style={styles.cardId}>Terminal ID: TPZ-7842-MCT</Text>
+              <Text style={styles.cardName}>Main Counter Scanner</Text>
+              <Text style={styles.cardId}>Scanner ID: TPZ-7842-NFC</Text>
               <View style={styles.cardBadge}>
                 <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.cardBadgeText}>NFC Enabled</Text>
+                <Text style={styles.cardBadgeText}>Ready for Payments</Text>
               </View>
             </View>
           </TouchableOpacity>
-        </View>
-
-        {/* All Terminals Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>All Terminals</Text>
-          <TouchableOpacity onPress={navigateToTerminalManagement}>
-            <Text style={styles.seeAllText}>See All</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.terminalGrid}>
-          {merchantTerminals.map((terminal) => (
-            <TouchableOpacity 
-              key={terminal.id}
-              style={styles.terminalItem}
-              onPress={() => handleTerminalSelect(terminal)}
-            >
-              <View style={styles.terminalIcon}>
-                <Ionicons name="card-outline" size={24} color="#ed7b0e" />
-              </View>
-              <Text style={styles.terminalTitle}>{terminal.name}</Text>
-              <View style={styles.terminalStatus}>
-                <View style={[
-                  styles.statusDot, 
-                  terminal.status === 'online' ? styles.onlineStatusDot : styles.offlineStatusDot
-                ]} />
-                <Text style={styles.terminalStatusText}>
-                  {terminal.status === 'online' ? 'Online' : 'Offline'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
         </View>
 
         {/* Merchant Offers Section */}
@@ -549,128 +444,8 @@ const DashboardScreen = () => {
                     <TouchableOpacity 
                       style={[styles.actionButton, {backgroundColor: '#FF3B30'}]}
                     >
-                      <Ionicons name="return-down-back-outline" size={20} color="#FFF" />
-                      <Text style={styles.actionButtonText}>Refund</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Terminal Settings Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showTerminalSettingsModal}
-        onRequestClose={() => setShowTerminalSettingsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Terminal Settings</Text>
-              <TouchableOpacity onPress={() => setShowTerminalSettingsModal(false)}>
-                <Ionicons name="close-circle" size={28} color="#666" />
-              </TouchableOpacity>
-            </View>
-            
-            {selectedTerminal && (
-              <View style={styles.modalContent}>
-                <View style={styles.terminalIcon}>
-                  <Ionicons name="card-outline" size={35} color="#ed7b0e" />
-                </View>
-                
-                <Text style={{fontSize: 26, fontWeight: 'bold', color: '#000000', textAlign: 'center', marginBottom: 5}}>
-                  {selectedTerminal.name}
-                </Text>
-                
-                <View style={styles.terminalStatus}>
-                  <View style={[
-                    styles.statusDot, 
-                    selectedTerminal.status === 'online' ? styles.onlineStatusDot : styles.offlineStatusDot,
-                    {width: 10, height: 10}
-                  ]} />
-                  <Text style={{fontSize: 16, color: selectedTerminal.status === 'online' ? '#4CD964' : '#FF3B30', fontWeight: '600', marginLeft: 5}}>
-                    {selectedTerminal.status === 'online' ? 'Online' : 'Offline'}
-                  </Text>
-                </View>
-                
-                <View style={styles.detailsItem}>
-                  <Text style={styles.detailsLabel}>Last Synced</Text>
-                  <Text style={styles.detailsValue}>{selectedTerminal.lastSynced}</Text>
-                </View>
-                
-                <View style={styles.detailsItem}>
-                  <Text style={styles.detailsLabel}>Battery Level</Text>
-                  <Text style={styles.detailsValue}>{selectedTerminal.batteryLevel}%</Text>
-                </View>
-                
-                <View style={styles.detailsItem}>
-                  <Text style={styles.detailsLabel}>Today's Transactions</Text>
-                  <Text style={styles.detailsValue}>{selectedTerminal.transactionCount}</Text>
-                </View>
-                
-                <View style={styles.detailsItem}>
-                  <Text style={styles.detailsLabel}>Terminal ID</Text>
-                  <Text style={styles.detailsValue}>TPZ-{Math.floor(Math.random() * 10000).toString().padStart(4, '0')}</Text>
-                </View>
-                
-                <Text style={{fontSize: 18, fontWeight: 'bold', color: '#000000', marginTop: 20, marginBottom: 10}}>
-                  Settings
-                </Text>
-                
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>Auto-sync transactions</Text>
-                  <Switch 
-                    value={true}
-                    trackColor={{ false: "#dedede", true: "#ed7b0e" }}
-                    thumbColor={"#FFFFFF"}
-                  />
-                </View>
-                
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>Allow contactless payments</Text>
-                  <Switch 
-                    value={true}
-                    trackColor={{ false: "#dedede", true: "#ed7b0e" }}
-                    thumbColor={"#FFFFFF"}
-                  />
-                </View>
-                
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>Allow QR code payments</Text>
-                  <Switch 
-                    value={true}
-                    trackColor={{ false: "#dedede", true: "#ed7b0e" }}
-                    thumbColor={"#FFFFFF"}
-                  />
-                </View>
-                
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>Print customer receipts</Text>
-                  <Switch 
-                    value={false}
-                    trackColor={{ false: "#dedede", true: "#ed7b0e" }}
-                    thumbColor={"#FFFFFF"}
-                  />
-                </View>
-                
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity 
-                    style={[styles.actionButton, styles.primaryButton]}
-                  >
-                    <Ionicons name="refresh-outline" size={20} color="#FFF" />
-                    <Text style={styles.actionButtonText}>Sync Now</Text>
-                  </TouchableOpacity>
-                  
-                  {selectedTerminal.status === 'offline' && (
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.secondaryButton]}
-                    >
-                      <Ionicons name="power-outline" size={20} color="#FFF" />
-                      <Text style={styles.actionButtonText}>Restart</Text>
+                      <Ionicons name="wallet-outline" size={20} color="#FFF" />
+                      <Text style={styles.actionButtonText}>Withdraw</Text>
                     </TouchableOpacity>
                   )}
                 </View>
