@@ -1,6 +1,5 @@
 import { StyleSheet } from "react-native";
 
-// Styles for the Statements Screen
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -47,113 +46,140 @@ const styles = StyleSheet.create({
   profileButton: {
     padding: 5,
   },
-  greetingSection: {
+  titleContainer: {
     paddingHorizontal: 20,
     paddingBottom: 15,
   },
-  greeting: {
+  screenTitle: {
     fontSize: 24,
     color: '#000000',
     fontWeight: 'bold',
   },
-  greetingSubtext: {
+  screenSubtitle: {
     fontSize: 14,
     color: '#666',
     marginTop: 4,
   },
-  tabContainer: {
+  actionsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: 15,
+    marginBottom: 15,
   },
-  tabButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    marginRight: 10,
-    borderRadius: 20,
-    backgroundColor: '#F0F0F0',
-  },
-  activeTabButton: {
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#ed7b0e',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
-  },
-  activeTabText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  contentContainer: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     flex: 1,
-    paddingHorizontal: 20,
+    marginRight: 8,
   },
-  summaryCard: {
+  filterButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flex: 1,
+    marginLeft: 8,
+  },
+  exportButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  summaryContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
-    marginBottom: 20,
+    margin: 15,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 3,
+      height: 4,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowRadius: 6,
+    elevation: 7,
   },
   summaryTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000000',
-    marginBottom: 15,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  summaryItem: {
-    width: '48%',
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#666',
     marginBottom: 5,
   },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  summaryDateRange: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 15,
   },
-  sectionTitle: {
+  summaryBoxes: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  summaryBox: {
+    flex: 1,
+    padding: 15,
+    backgroundColor: '#F7F8FA',
+    borderRadius: 12,
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  summaryBoxTitle: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  summaryBoxValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000000',
   },
-  filterText: {
-    fontSize: 14,
-    color: '#ed7b0e',
-    fontWeight: '500',
+  netAmountBox: {
+    backgroundColor: '#ed7b0e',
   },
-  statementsList: {
-    flex: 1,
-    marginBottom: 20,
+  netAmountValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
-  statementItem: {
+  feesContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
+    marginTop: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  feesLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  feesValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000000',
+  },
+  statementsContainer: {
+    flex: 1,
+    paddingHorizontal: 15,
+  },
+  monthSection: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -161,227 +187,111 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-    elevation: 3,
+    elevation: 4,
+    overflow: 'hidden',
   },
-  statementIconContainer: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  monthHeader: {
     backgroundColor: '#F7F8FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  statementInfo: {
-    flex: 1,
-  },
-  statementMonth: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  statementDate: {
-    fontSize: 13,
-    color: '#666',
-  },
-  statementDetails: {
-    alignItems: 'flex-end',
-  },
-  statementAmount: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000000',
-    marginBottom: 8,
-  },
-  downloadButton: {
-    backgroundColor: '#ed7b0e',
-    borderRadius: 8,
-    padding: 6,
-  },
-  payoutSummaryCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  payoutSummaryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  payoutSummaryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  editButton: {
-    padding: 5,
-  },
-  editButtonText: {
-    fontSize: 14,
-    color: '#ed7b0e',
-    fontWeight: '500',
-  },
-  bankAccountInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: '#F7F8FA',
-    borderRadius: 12,
-  },
-  bankLogoContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  bankLogoText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  bankDetails: {
-    flex: 1,
-  },
-  bankName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  accountNumber: {
-    fontSize: 14,
-    color: '#666',
-  },
-  payoutSettingsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  monthTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  payoutSettingsLabel: {
-    fontSize: 15,
-    color: '#666',
-  },
-  payoutSettingsValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  payoutsList: {
-    marginBottom: 20,
-  },
-  payoutItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  payoutIconContainer: {
+  transactionIcon: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
   },
-  payoutInfo: {
+  receiveIcon: {
+    backgroundColor: '#ed7b0e',
+  },
+  refundIcon: {
+    backgroundColor: '#555555',
+  },
+  withdrawIcon: {
+    backgroundColor: '#000000',
+  },
+  transactionInfo: {
     flex: 1,
   },
-  payoutAmount: {
+  transactionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#000000',
     marginBottom: 4,
   },
-  payoutDate: {
+  transactionCategory: {
     fontSize: 13,
     color: '#666',
   },
-  payoutDetails: {
+  transactionAmountContainer: {
     alignItems: 'flex-end',
   },
-  payoutAccount: {
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  positiveAmount: {
+    color: '#ed7b0e',
+  },
+  negativeAmount: {
+    color: '#FF3B30',
+  },
+  transactionMethod: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
+    backgroundColor: '#FFFFFF',
+  },
+  paginationButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+  },
+  disabledButton: {
+    backgroundColor: '#F7F7F7',
+  },
+  paginationText: {
+    marginHorizontal: 15,
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
   },
-  payoutStatus: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-  },
-  statusCompleted: {
-    backgroundColor: '#28A745',
-  },
-  statusPending: {
-    backgroundColor: '#FFC107',
-  },
-  payoutStatusText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  requestPayoutButton: {
-    flexDirection: 'row',
+  noTransactionsContainer: {
+    padding: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ed7b0e',
-    borderRadius: 12,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    marginBottom: 30,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 15,
   },
-  requestPayoutText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+  noTransactionsText: {
+    marginTop: 15,
     fontSize: 16,
-    marginLeft: 10,
-  },
-  dashboardButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 6,
+    color: '#666',
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
@@ -392,7 +302,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
     maxHeight: '90%',
   },
   modalHeader: {
@@ -409,124 +321,181 @@ const styles = StyleSheet.create({
   modalContent: {
     paddingBottom: 20,
   },
-  statementTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  statementTitleInfo: {
-    marginLeft: 15,
-  },
-  statementTitleText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  statementSubtitle: {
+  inputLabel: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  statementSummaryCard: {
-    backgroundColor: '#F7F8FA',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
-  },
-  statementSummaryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  statementSummaryLabel: {
-    fontSize: 16,
-    color: '#666',
-  },
-  statementSummaryValue: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#000000',
+    color: '#666',
+    marginBottom: 8,
+    marginTop: 16,
   },
-  netAmountItem: {
-    borderBottomWidth: 0,
-    marginTop: 5,
-  },
-  netAmountLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  netAmountValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  paymentInfoCard: {
-    backgroundColor: '#F7F8FA',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
-  },
-  paymentInfoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 15,
-  },
-  paymentInfoItem: {
+  dateInput: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  paymentInfoLabel: {
-    fontSize: 15,
-    color: '#666',
-  },
-  paymentInfoValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  paymentStatusBadge: {
-    backgroundColor: '#28A745',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    backgroundColor: '#F7F8FA',
     borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
-  paymentStatusText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
+  dateInputText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  predefinedFilters: {
+    marginTop: 20,
+  },
+  filterChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
+  },
+  filterChip: {
+    backgroundColor: '#F0F0F0',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  filterChipText: {
+    fontSize: 14,
+    color: '#333333',
   },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
+    marginTop: 30,
   },
-  modalActionButton: {
+  resetButton: {
+    flex: 1,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  resetButtonText: {
+    color: '#666666',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  applyButton: {
+    flex: 1,
+    backgroundColor: '#ed7b0e',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  applyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  submitButton: {
+    backgroundColor: '#ed7b0e',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 30,
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  formatOptions: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  formatOption: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000',
-    borderRadius: 12,
     paddingVertical: 15,
-    paddingHorizontal: 20,
-    flex: 1,
+    backgroundColor: '#F7F8FA',
+    borderRadius: 12,
     marginHorizontal: 5,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
-  downloadActionButton: {
-    backgroundColor: '#ed7b0e',
+  selectedFormat: {
+    borderColor: '#ed7b0e',
+    backgroundColor: 'rgba(237, 123, 14, 0.05)',
   },
-  modalActionText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+  formatText: {
     fontSize: 14,
-    marginLeft: 8,
+    color: '#777',
+    marginTop: 6,
+  },
+  selectedFormatText: {
+    fontSize: 14,
+    color: '#ed7b0e',
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  exportDateRange: {
+    fontSize: 16,
+    color: '#333333',
+    backgroundColor: '#F7F8FA',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  emailInputContainer: {
+    backgroundColor: '#F7F8FA',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginTop: 10,
+  },
+  emailInput: {
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#333333',
+  },
+  emptyListContainer: {
+    padding: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 15,
+    marginBottom: 20,
+  },
+  emptyListText: {
+    marginTop: 15,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  emptyListSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  filterStatusContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: 15,
+    marginBottom: 15,
+  },
+  filterStatusText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  clearFilterText: {
+    fontSize: 14,
+    color: '#ed7b0e',
+    fontWeight: '500',
   },
 });
 
