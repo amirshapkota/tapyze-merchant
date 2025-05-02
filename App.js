@@ -7,6 +7,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import WelcomeScreen from './app/screens/WelcomeScreen';
 import AuthScreen from './app/screens/AuthScreen';
 import MerchantDashboardScreen from './app/screens/DashboardScreen';
+import AnalyticsScreen from './app/screens/AnalyticsScreen';
 
 
 // Create navigation stack
@@ -17,7 +18,7 @@ const App = () => {
     <NavigationContainer>
       <StatusBar backgroundColor="#ffffff" barStyle="dark-content" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Dashboard" component={MerchantDashboardScreen} />
+        <Stack.Screen name="Dashboard" component={AnalyticsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
