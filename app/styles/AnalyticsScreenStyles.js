@@ -187,38 +187,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginLeft: -15,
   },
-  comparisonToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    paddingTop: 15,
-  },
-  comparisonText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  toggleButton: {
-    width: 46,
-    height: 26,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 13,
-    padding: 3,
-    justifyContent: 'center',
-  },
-  toggleActive: {
-    backgroundColor: '#ed7b0e',
-  },
-  toggleCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-  },
-  toggleCircleActive: {
-    alignSelf: 'flex-end',
-  },
   summaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',

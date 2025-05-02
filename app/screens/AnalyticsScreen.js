@@ -82,7 +82,6 @@ const AnalyticsScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState('weekly');
   const [selectedChart, setSelectedChart] = useState('revenue');
-  const [comparisonMode, setComparisonMode] = useState(false);
   const [showRevenue, setShowRevenue] = useState(true);
   const screenWidth = Dimensions.get("window").width - 40;
   
@@ -305,15 +304,6 @@ const AnalyticsScreen = () => {
             />
           </View>
 
-          <View style={styles.comparisonToggle}>
-            <Text style={styles.comparisonText}>Compare with previous period</Text>
-            <TouchableOpacity 
-              style={[styles.toggleButton, comparisonMode && styles.toggleActive]}
-              onPress={() => setComparisonMode(!comparisonMode)}
-            >
-              <View style={[styles.toggleCircle, comparisonMode && styles.toggleCircleActive]} />
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* Summary Cards */}
