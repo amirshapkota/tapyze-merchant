@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#ed7b0e',
     fontWeight: 'bold',
-    marginLeft: 5,
+    marginLeft: 10,
   },
   profileButton: {
     padding: 5,
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   },
   timeframeOption: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 25,
     borderRadius: 20,
   },
   timeframeActive: {

@@ -173,7 +173,7 @@ const DashboardScreen = () => {
         <View style={styles.statsContainer}>
           <View style={styles.statsHeader}>
             <View>
-              <Text style={styles.statsLabel}>Total Revenue</Text>
+              <Text style={styles.statsLabel}>Total Balance</Text>
               <View style={styles.statsRow}>
                 <Text style={styles.statsAmount}>
                   {showRevenue ? totalRevenue.toFixed(2) : '••••••'}
@@ -445,7 +445,7 @@ const DashboardScreen = () => {
                       style={[styles.actionButton, {backgroundColor: '#FF3B30'}]}
                     >
                       <Ionicons name="wallet-outline" size={20} color="#FFF" />
-                      <Text style={styles.actionButtonText}>Withdraw</Text>
+                      <Text style={styles.actionButtonText}>Refund</Text>
                     </TouchableOpacity>
                   )}
                 </View>
