@@ -183,7 +183,7 @@ const MerchantSettingsScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#AAAAAA" />
           </TouchableOpacity>
         </View>
-
+{/* 
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Business Settings</Text>
           
@@ -210,7 +210,7 @@ const MerchantSettingsScreen = () => {
             </View>
             <Ionicons name="chevron-forward" size={20} color="#AAAAAA" />
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Support</Text>
