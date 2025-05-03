@@ -9,6 +9,7 @@ import AuthScreen from './app/screens/AuthScreen';
 import AnalyticsScreen from './app/screens/AnalyticsScreen';
 import StatementsScreen from './app/screens/StatementsScreen';
 import DashboardScreen from './app/screens/DashboardScreen';
+import SettingsScreen from './app/screens/SettingsScreen';
 
 
 // Create navigation stack
@@ -19,7 +20,7 @@ const App = () => {
     <NavigationContainer>
       <StatusBar backgroundColor="#ffffff" barStyle="dark-content" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Dashboard" component={StatementsScreen} />
+        <Stack.Screen name="Dashboard" component={SettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
