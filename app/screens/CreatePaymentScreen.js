@@ -167,7 +167,7 @@ const CreatePaymentScreen = () => {
       setTransactionId(txId);
       
       // Simulate 70% success rate
-      const isSuccess = Math.random() < 0.3;
+      const isSuccess = Math.random() > 0.3;
       
       // Update payment status
       setPaymentStatus(isSuccess ? 'success' : 'failed');

@@ -399,9 +399,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     marginTop: 10,
-  },
-  
-  // ======== FAILED RESULT ========
+  },  
   failedIconCircle: {
     width: 90,
     height: 90,
