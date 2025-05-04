@@ -12,6 +12,7 @@ import DashboardScreen from './app/screens/DashboardScreen';
 import SettingsScreen from './app/screens/SettingsScreen';
 import EditProfileScreen from './app/screens/EditProfileScreen';
 import ChangePasswordScreen from './app/screens/ChangePasswordScreen';
+import ForgotPasswordScreen from './app/screens/ForgotPasswordScreen';
 
 
 // Create navigation stack
@@ -22,7 +23,7 @@ const App = () => {
     <NavigationContainer>
       <StatusBar backgroundColor="#ffffff" barStyle="dark-content" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Dashboard" component={ChangePasswordScreen} />
+        <Stack.Screen name="Dashboard" component={ForgotPasswordScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
