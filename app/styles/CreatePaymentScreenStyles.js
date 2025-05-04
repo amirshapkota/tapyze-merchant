@@ -1,23 +1,14 @@
 import { StyleSheet } from "react-native";
 
-/**
- * Styles for the Create Payment Screen - Professional edition
- * 
- * Matching the TAPYZE Merchant dashboard visual language with
- * enhanced professional styling for the payment flow
- */
 const styles = StyleSheet.create({
-  // ======== LAYOUT CONTAINERS ========
   container: {
     flex: 1,
     backgroundColor: '#F7F8FA',
   },
   scrollContent: {
     paddingHorizontal: 15,
-    paddingBottom: 30,
+    paddingBottom: 20,
   },
-  
-  // ======== HEADER STYLES ========
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -47,23 +38,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 5,
-  },
-  
-  // ======== TITLE SECTION ========
-  titleContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-  },
-  pageTitle: {
-    fontSize: 24,
-    color: '#000000',
-    fontWeight: 'bold',
-  },
-  pageSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
+  },  
   titleSection: {
     paddingHorizontal: 20,
     paddingBottom: 15,
@@ -77,13 +52,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
-  },
-  
-  // ======== PAYMENT CARD ========
+  },  
   paymentCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
+    padding: 15,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -93,12 +66,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
     marginBottom: 20,
+    marginTop: 10,
   },
   cardHeader: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: '#000000',
     textAlign: 'center',
@@ -108,11 +82,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
-  },
-  
-  // ======== AMOUNT ENTRY ========
+  },  
   amountDisplayContainer: {
-    marginBottom: 20,
+    marginBottom: 30,
   },
   amountDisplay: {
     flexDirection: 'row',
@@ -147,14 +119,11 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 14,
     marginLeft: 5,
-  },
-  
-  // ======== NUMBER PAD ========
+  },  
   numberPad: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24,
   },
   numberKey: {
     width: '31%',
@@ -174,9 +143,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#000000',
-  },
-  
-  // ======== ACTION BUTTONS ========
+  },  
   actionContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -213,7 +180,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   cancelButton: {
-    backgroundColor: '#666666',
+    backgroundColor: '#000000',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -229,9 +196,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
-  },
-  
-  // ======== NFC PAYMENT READY ========
+  },  
   amountSummary: {
     alignItems: 'center',
     marginBottom: 25,
@@ -314,9 +279,7 @@ const styles = StyleSheet.create({
   devButtonText: {
     color: '#007AFF',
     fontWeight: '600',
-  },
-  
-  // ======== PROCESSING ========
+  },  
   processingContainer: {
     alignItems: 'center',
     paddingVertical: 30,
@@ -342,9 +305,7 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 5,
-  },
-  
-  // ======== SUCCESS RESULT ========
+  },  
   resultHeader: {
     alignItems: 'center',
     marginBottom: 25,
@@ -431,7 +392,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   homeButton: {
-    backgroundColor: '#000000',
+    backgroundColor: '#000001',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

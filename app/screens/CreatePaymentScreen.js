@@ -15,31 +15,21 @@ import { useNavigation } from '@react-navigation/native';
 
 import styles from '../styles/CreatePaymentScreenStyles';
 
-/**
- * CreatePaymentScreen
- * 
- * Professional payment processing screen for the TAPYZE Merchant platform.
- * Designed to handle NFC contactless payments with a clean, intuitive interface.
- */
 const CreatePaymentScreen = () => {
-  // ======== CONSTANTS ========
   const CURRENCY = 'Rs.';
   const MIN_AMOUNT = 0;
   const MAX_TRANSACTION_TIMEOUT = 30000; // 30 seconds timeout for transactions
   
-  // ======== HOOKS ========
   const navigation = useNavigation();
   const nfcAnimation = useRef(new Animated.Value(1)).current;
   const scaleAnimation = useRef(new Animated.Value(0.95)).current;
   
-  // ======== STATE ========
   const [amount, setAmount] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('initial'); // 'initial', 'ready', 'processing', 'success', 'failed'
   const [errorMessage, setErrorMessage] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [processingTimeout, setProcessingTimeout] = useState(null);
   
-  // ======== LIFECYCLE ========
   useEffect(() => {
     // Animate card scaling on mount
     Animated.timing(scaleAnimation, {
@@ -56,11 +46,9 @@ const CreatePaymentScreen = () => {
     };
   }, []);
   
-  // ======== NAVIGATION HANDLERS ========
   const handleGoBack = () => {
-    // Confirm if in the middle of a transaction
     if (paymentStatus === 'processing') {
-      // Would show confirmation dialog in production
+      // confirmation dialog
       return;
     }
     
@@ -74,14 +62,14 @@ const CreatePaymentScreen = () => {
     });
   };
   
-  // ======== AMOUNT HANDLERS ========
+  // amount handlers
   const handleNumberPress = (number) => {
     // If amount already has two decimal places, don't add more digits
     if (amount.includes('.') && amount.split('.')[1].length >= 2) {
       return;
     }
     
-    // Maximum amount validation (for demo purposes)
+    // Maximum amount validation (for demo purpose)
     if (!amount.includes('.') && amount.length >= 6) {
       return; // Limit to 999,999
     }
@@ -103,10 +91,8 @@ const CreatePaymentScreen = () => {
       return;
     }
     
-    // Otherwise, append the number to the current amount
     setAmount(amount + number);
     
-    // Clear any error messages when user is typing
     if (errorMessage) {
       setErrorMessage('');
     }
@@ -130,7 +116,6 @@ const CreatePaymentScreen = () => {
     return numValue.toFixed(2);
   };
   
-  // ======== PAYMENT FLOW HANDLERS ========
   const handleNextPress = () => {
     // Amount validation
     if (!amount || parseFloat(amount) <= MIN_AMOUNT) {
@@ -182,7 +167,7 @@ const CreatePaymentScreen = () => {
       setTransactionId(txId);
       
       // Simulate 70% success rate
-      const isSuccess = Math.random() > 0.3;
+      const isSuccess = Math.random() < 0.3;
       
       // Update payment status
       setPaymentStatus(isSuccess ? 'success' : 'failed');
@@ -218,9 +203,7 @@ const CreatePaymentScreen = () => {
     setErrorMessage('');
     setTransactionId('');
   };
-  
-  // ======== RENDER COMPONENTS ========
-  
+    
   const renderAmountDisplay = () => {
     return (
       <View style={styles.amountDisplayContainer}>
@@ -565,15 +548,6 @@ const CreatePaymentScreen = () => {
               >
                 <Ionicons name="refresh-outline" size={20} color="#FFFFFF" />
                 <Text style={styles.buttonText}>Retry Payment</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.cancelButton}
-                activeOpacity={0.8}
-                onPress={resetPayment}
-              >
-                <Ionicons name="close-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
