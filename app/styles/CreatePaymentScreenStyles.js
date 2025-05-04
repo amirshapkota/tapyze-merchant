@@ -1,19 +1,23 @@
 import { StyleSheet } from "react-native";
 
-// Styles for the Create Payment Screen
+/**
+ * Styles for the Create Payment Screen - Professional edition
+ * 
+ * Matching the TAPYZE Merchant dashboard visual language with
+ * enhanced professional styling for the payment flow
+ */
 const styles = StyleSheet.create({
+  // ======== LAYOUT CONTAINERS ========
   container: {
     flex: 1,
     backgroundColor: '#F7F8FA',
   },
-  keyboardAvoidView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    flexGrow: 1,
+  scrollContent: {
+    paddingHorizontal: 15,
     paddingBottom: 30,
   },
-  // Header styles - Matching Scanner screen
+  
+  // ======== HEADER STYLES ========
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -41,16 +45,31 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 10,
   },
-  profileButton: {
+  backButton: {
     padding: 5,
   },
-  // Title section
+  
+  // ======== TITLE SECTION ========
+  titleContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  pageTitle: {
+    fontSize: 24,
+    color: '#000000',
+    fontWeight: 'bold',
+  },
+  pageSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
   titleSection: {
     paddingHorizontal: 20,
     paddingBottom: 15,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: 28,
     color: '#000000',
     fontWeight: 'bold',
   },
@@ -60,103 +79,185 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   
-  // Amount entry styles
-  amountContainer: {
+  // ======== PAYMENT CARD ========
+  paymentCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 15,
+    borderRadius: 16,
     padding: 20,
-    margin: 15,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 6,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  amountLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000000',
+    shadowRadius: 8,
+    elevation: 8,
     marginBottom: 20,
+  },
+  cardHeader: {
+    marginBottom: 20,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000000',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: '#666',
     textAlign: 'center',
   },
-  inputContainer: {
+  
+  // ======== AMOUNT ENTRY ========
+  amountDisplayContainer: {
+    marginBottom: 20,
+  },
+  amountDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 25,
+    paddingVertical: 16,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
   },
   currencySymbol: {
-    fontSize: 38,
-    fontWeight: '500',
+    fontSize: 26,
+    fontWeight: '600',
     color: '#000000',
-    marginRight: 5,
+    marginRight: 8,
   },
-  amountInput: {
-    fontSize: 40,
+  amountText: {
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#000000',
-    minWidth: 150,
-    textAlign: 'center',
+    letterSpacing: 0.5,
+    fontFamily: 'System',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
   },
   errorText: {
     color: '#FF3B30',
-    textAlign: 'center',
-    marginBottom: 15,
+    fontSize: 14,
+    marginLeft: 5,
+  },
+  
+  // ======== NUMBER PAD ========
+  numberPad: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  numberKey: {
+    width: '31%',
+    aspectRatio: 1.6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+    borderRadius: 12,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  keyText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  
+  // ======== ACTION BUTTONS ========
+  actionContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   nextButton: {
+    flex: 1,
     backgroundColor: '#ed7b0e',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 10,
-    paddingVertical: 15,
-    marginTop: 10,
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginLeft: 5,
+    elevation: 3,
+    shadowColor: '#ed7b0e',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  nextButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  
-  // Tap screen styles
-  tapContainer: {
+  clearButton: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  amountDisplay: {
+    backgroundColor: '#000000',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
-  },
-  amountDisplayLabel: {
-    fontSize: 18,
-    color: '#666',
+    borderRadius: 12,
+    paddingVertical: 14,
     marginRight: 5,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  amountDisplayValue: {
-    fontSize: 26,
+  cancelButton: {
+    backgroundColor: '#666666',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  
+  // ======== NFC PAYMENT READY ========
+  amountSummary: {
+    alignItems: 'center',
+    marginBottom: 25,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  amountLabel: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 5,
+  },
+  summaryAmount: {
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#000000',
+    letterSpacing: 0.5,
   },
-  tapIconContainer: {
+  nfcContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
   },
-  tapCircle: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+  nfcCircle: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
     backgroundColor: '#ed7b0e',
     justifyContent: 'center',
     alignItems: 'center',
@@ -170,129 +271,233 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 10,
   },
-  tapInstructions: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  nfcInstructions: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 20,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#BFE3FF',
+  },
+  statusIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#007AFF',
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  devButton: {
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginBottom: 15,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 122, 255, 0.3)',
+  },
+  devButtonText: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  
+  // ======== PROCESSING ========
+  processingContainer: {
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+  processingStatusContainer: {
+    alignItems: 'center',
+    marginTop: 25,
+  },
+  processingText: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#000000',
     marginBottom: 10,
   },
-  tapSubtext: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  simulateTapButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 10,
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    marginBottom: 15,
-  },
-  simulateTapText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  processingAmount: {
+    fontSize: 28,
     fontWeight: 'bold',
-  },
-  cancelButton: {
-    borderRadius: 10,
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderWidth: 1,
-    borderColor: '#666',
-  },
-  cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  
-  // Processing styles
-  processingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  processingText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginTop: 20,
+    color: '#ed7b0e',
     marginBottom: 10,
   },
   processingSubtext: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
+    marginTop: 5,
   },
   
-  // Result styles (success/failure)
-  resultContainer: {
-    flex: 1,
+  // ======== SUCCESS RESULT ========
+  resultHeader: {
+    alignItems: 'center',
+    marginBottom: 25,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  successIconCircle: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    marginBottom: 15,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
   },
-  successIcon: {
-    marginBottom: 20,
-  },
-  successText: {
+  successTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#4CAF50',
-    marginBottom: 15,
+    marginBottom: 5,
   },
-  successAmount: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 15,
-  },
-  successTransactionId: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 40,
-  },
-  failedIcon: {
-    marginBottom: 20,
-  },
-  failedText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF3B30',
-    marginBottom: 15,
-  },
-  failedSubtext: {
+  successSubtitle: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 40,
-    paddingHorizontal: 20,
   },
-  retryButton: {
-    backgroundColor: '#ed7b0e',
-    borderRadius: 10,
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    marginBottom: 15,
+  resultDetails: {
+    marginBottom: 25,
   },
-  retryButtonText: {
-    color: '#FFFFFF',
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  detailLabel: {
     fontSize: 16,
+    color: '#666',
+  },
+  detailValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    maxWidth: '60%',
+    textAlign: 'right',
+  },
+  tagContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  successTag: {
+    fontSize: 12,
     fontWeight: 'bold',
+    color: '#4CAF50',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.2)',
   },
   newPaymentButton: {
-    borderRadius: 10,
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderWidth: 1,
-    borderColor: '#ed7b0e',
+    flex: 1,
+    backgroundColor: '#ed7b0e',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingVertical: 14,
+    elevation: 3,
+    shadowColor: '#ed7b0e',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  newPaymentText: {
-    color: '#ed7b0e',
+  homeButton: {
+    backgroundColor: '#000000',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  
+  // ======== FAILED RESULT ========
+  failedIconCircle: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  failedTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FF3B30',
+    marginBottom: 5,
+  },
+  failedSubtitle: {
     fontSize: 16,
-    fontWeight: '500',
+    color: '#666',
+    textAlign: 'center',
   },
+  failedTag: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FF3B30',
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 48, 0.2)',
+  },
+  errorValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF3B30',
+  },
+  retryButton: {
+    flex: 1,
+    backgroundColor: '#ed7b0e',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginRight: 5,
+    elevation: 3,
+    shadowColor: '#ed7b0e',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  }
 });
 
 export default styles;
