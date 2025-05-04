@@ -14,6 +14,7 @@ import EditProfileScreen from './app/screens/EditProfileScreen';
 import ChangePasswordScreen from './app/screens/ChangePasswordScreen';
 import ForgotPasswordScreen from './app/screens/ForgotPasswordScreen';
 import ScannerScreen from './app/screens/ScannerScreen';
+import CreatePaymentScreen from './app/screens/CreatePaymentScreen';
 
 
 // Create navigation stack
@@ -24,7 +25,7 @@ const App = () => {
     <NavigationContainer>
       <StatusBar backgroundColor="#ffffff" barStyle="dark-content" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Dashboard" component={ScannerScreen} />
+        <Stack.Screen name="Dashboard" component={CreatePaymentScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
