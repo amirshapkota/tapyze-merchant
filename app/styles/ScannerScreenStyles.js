@@ -9,6 +9,7 @@ const styles = StyleSheet.create({
   scrollViewContent: {
     paddingBottom: 30,
   },
+  // Header styles - Identical to Dashboard
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -39,16 +40,17 @@ const styles = StyleSheet.create({
   profileButton: {
     padding: 5,
   },
-  titleSection: {
+  // Greeting section - Identical to Dashboard
+  greetingSection: {
     paddingHorizontal: 20,
     paddingBottom: 15,
   },
-  screenTitle: {
+  greeting: {
     fontSize: 24,
     color: '#000000',
     fontWeight: 'bold',
   },
-  screenSubtitle: {
+  greetingSubtext: {
     fontSize: 14,
     color: '#666',
     marginTop: 4,
@@ -56,6 +58,7 @@ const styles = StyleSheet.create({
   scannerCardContainer: {
     paddingHorizontal: 15,
     marginBottom: 20,
+    marginTop: 5,
   },
   scannerCard: {
     borderRadius: 16,
@@ -222,9 +225,6 @@ const styles = StyleSheet.create({
   valueDisconnected: {
     color: '#FF3B30',
   },
-  detailIcon: {
-    marginLeft: 8,
-  },
   statusDot: {
     width: 8,
     height: 8,
@@ -237,43 +237,38 @@ const styles = StyleSheet.create({
   statusDisconnected: {
     backgroundColor: '#FF3B30',
   },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  // New styles for single Accept Payment button
+  paymentActionContainer: {
     paddingHorizontal: 15,
     marginBottom: 25,
   },
-  quickActionItem: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
+  paymentActionButton: {
+    backgroundColor: '#ed7b0e',
     borderRadius: 12,
-    padding: 18,
-    margin: '1%',
+    padding: 20,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 5,
   },
-  primaryActionItem: {
-    backgroundColor: '#ed7b0e',
-  },
-  quickActionIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  paymentActionIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    marginBottom: 15,
   },
-  quickActionTitle: {
-    fontSize: 15,
+  paymentActionTitle: {
+    fontSize: 18,
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: 'bold',
     textAlign: 'center',
   },
   helpSection: {
@@ -318,98 +313,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  modalContent: {
-    paddingBottom: 20,
-  },
-  settingsSection: {
-    backgroundColor: '#F7F8FA',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 20,
-  },
-  settingsSectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 15,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  settingLabel: {
-    fontSize: 16,
-    color: '#000000',
-  },
-  settingValue: {
-    fontSize: 16,
-    color: '#666',
-    marginRight: 8,
-  },
-  settingEditButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  settingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  settingButtonText: {
-    fontSize: 16,
-    color: '#000000',
-    marginLeft: 12,
-  },
-  dangerSection: {
-    marginTop: 10,
-    marginBottom: 15,
-  },
-  dangerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#FF3B30',
-    borderRadius: 12,
-    marginBottom: 15,
-  },
-  dangerButtonText: {
-    color: '#FF3B30',
-    fontWeight: '600',
-    marginLeft: 8,
   },
 });
 

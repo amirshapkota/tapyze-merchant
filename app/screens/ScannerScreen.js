@@ -6,9 +6,7 @@ import {
   ScrollView, 
   Image, 
   SafeAreaView, 
-  ActivityIndicator,
-  Switch,
-  Modal
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -22,11 +20,7 @@ const ScannerScreen = () => {
   // State for scanner
   const [isConnected, setIsConnected] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
-  const [batteryLevel, setBatteryLevel] = useState(85);
   const [lastActive, setLastActive] = useState('2 minutes ago');
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [autoSleep, setAutoSleep] = useState(true);
-  const [transactionSounds, setTransactionSounds] = useState(true);
   
   // Scanner details
   const scannerDetails = {
@@ -39,8 +33,8 @@ const ScannerScreen = () => {
   // Simulate checking connection status
   useEffect(() => {
     const connectionCheck = setInterval(() => {
-      // Random connection status for test
-      // this would check actual serial connection
+      // Random connection status for demonstration
+      // In real app, this would check actual serial connection
       if (Math.random() > 0.8) {
         setIsConnected(prev => !prev);
       }
@@ -70,15 +64,10 @@ const ScannerScreen = () => {
   const navigateToCreatePayment = () => {
     navigation.navigate('CreatePayment');
   };
-  
-  // Open scanner settings
-  const openSettings = () => {
-    setShowSettingsModal(true);
-  };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header Section */}
+      {/* Header Section - Same as Dashboard */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <Image 
@@ -95,14 +84,14 @@ const ScannerScreen = () => {
           style={styles.profileButton}
           onPress={navigateToDashboard}
         >
-          <Ionicons name="home-outline" size={30} color="#ed7b0e" />
+          <Ionicons name="person-circle-outline" size={40} color="#ed7b0e" />
         </TouchableOpacity>
       </View>
 
-      {/* Title Section */}
-      <View style={styles.titleSection}>
-        <Text style={styles.screenTitle}>NFC Scanner</Text>
-        <Text style={styles.screenSubtitle}>Manage your payment terminal</Text>
+      {/* Greeting Section - Same as Dashboard */}
+      <View style={styles.greetingSection}>
+        <Text style={styles.greeting}>Hello, Coffee Shop</Text>
+        <Text style={styles.greetingSubtext}>Manage your NFC scanner</Text>
       </View>
       
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
@@ -126,7 +115,7 @@ const ScannerScreen = () => {
                   isConnected ? styles.connectionActive : styles.connectionInactive
                 ]}>
                   <Ionicons 
-                    name={isConnected ? "radio-outline" : "radio-outline"} 
+                    name="radio-outline" 
                     size={20} 
                     color="#FFFFFF" 
                   />
@@ -183,19 +172,6 @@ const ScannerScreen = () => {
             </View>
             
             <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Battery Level</Text>
-              <View style={styles.detailValueContainer}>
-                <Text style={styles.detailValue}>{batteryLevel}%</Text>
-                <Ionicons 
-                  name="battery-half-outline" 
-                  size={20} 
-                  color={batteryLevel > 20 ? "#4CAF50" : "#FF3B30"} 
-                  style={styles.detailIcon}
-                />
-              </View>
-            </View>
-            
-            <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Last Active</Text>
               <Text style={styles.detailValue}>{lastActive}</Text>
             </View>
@@ -212,44 +188,16 @@ const ScannerScreen = () => {
           </View>
         </View>
         
-        {/* Quick Actions */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-        </View>
-        
-        <View style={styles.quickActionsGrid}>
+        {/* Accept Payment - Single Action */}
+        <View style={styles.paymentActionContainer}>
           <TouchableOpacity 
-            style={[styles.quickActionItem, styles.primaryActionItem]}
+            style={styles.paymentActionButton}
             onPress={navigateToCreatePayment}
           >
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="cash-outline" size={24} color="#FFFFFF" />
+            <View style={styles.paymentActionIcon}>
+              <Ionicons name="cash-outline" size={28} color="#FFFFFF" />
             </View>
-            <Text style={styles.quickActionTitle}>Accept Payment</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.quickActionItem}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="qr-code-outline" size={24} color="#FFFFFF" />
-            </View>
-            <Text style={styles.quickActionTitle}>Generate QR</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.quickActionItem}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="stats-chart-outline" size={24} color="#FFFFFF" />
-            </View>
-            <Text style={styles.quickActionTitle}>Transaction History</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.quickActionItem}
-            onPress={openSettings}
-          >
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
-            </View>
-            <Text style={styles.quickActionTitle}>Settings</Text>
+            <Text style={styles.paymentActionTitle}>Accept Payment</Text>
           </TouchableOpacity>
         </View>
         
@@ -268,98 +216,6 @@ const ScannerScreen = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-      
-      {/* Settings Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showSettingsModal}
-        onRequestClose={() => setShowSettingsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Scanner Settings</Text>
-              <TouchableOpacity onPress={() => setShowSettingsModal(false)}>
-                <Ionicons name="close-circle" size={28} color="#666" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={styles.modalContent}>
-              <View style={styles.settingsSection}>
-                <Text style={styles.settingsSectionTitle}>Basic Settings</Text>
-                
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>Scanner Name</Text>
-                  <TouchableOpacity style={styles.settingEditButton}>
-                    <Text style={styles.settingValue}>{scannerDetails.name}</Text>
-                    <Ionicons name="create-outline" size={20} color="#ed7b0e" />
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>Location</Text>
-                  <TouchableOpacity style={styles.settingEditButton}>
-                    <Text style={styles.settingValue}>{scannerDetails.location}</Text>
-                    <Ionicons name="create-outline" size={20} color="#ed7b0e" />
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>Auto Sleep Mode</Text>
-                  <Switch
-                    trackColor={{ false: "#ccc", true: "#ed7b0e" }}
-                    thumbColor="#fff"
-                    value={autoSleep}
-                    onValueChange={setAutoSleep}
-                  />
-                </View>
-                
-                <View style={styles.settingItem}>
-                  <Text style={styles.settingLabel}>Transaction Sounds</Text>
-                  <Switch
-                    trackColor={{ false: "#ccc", true: "#ed7b0e" }}
-                    thumbColor="#fff"
-                    value={transactionSounds}
-                    onValueChange={setTransactionSounds}
-                  />
-                </View>
-              </View>
-              
-              <View style={styles.settingsSection}>
-                <Text style={styles.settingsSectionTitle}>Advanced Settings</Text>
-                
-                <TouchableOpacity style={styles.settingButton}>
-                  <Ionicons name="sync-outline" size={20} color="#ed7b0e" />
-                  <Text style={styles.settingButtonText}>Update Firmware</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.settingButton}>
-                  <Ionicons name="bluetooth-outline" size={20} color="#ed7b0e" />
-                  <Text style={styles.settingButtonText}>Connection Settings</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.settingButton}>
-                  <Ionicons name="cash-outline" size={20} color="#ed7b0e" />
-                  <Text style={styles.settingButtonText}>Payment Thresholds</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.dangerSection}>
-                <TouchableOpacity style={styles.dangerButton}>
-                  <Ionicons name="refresh-circle-outline" size={20} color="#FF3B30" />
-                  <Text style={styles.dangerButtonText}>Factory Reset</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.dangerButton}>
-                  <Ionicons name="help-circle-outline" size={20} color="#FF3B30" />
-                  <Text style={styles.dangerButtonText}>Report Problem</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
