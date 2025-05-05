@@ -73,24 +73,24 @@ const DashboardScreen = () => {
     ? transactions 
     : transactions.filter(transaction => transaction.type === selectedTab);
 
-  // Navigate to profile/settings screen
   const navigateToProfile = () => {
     navigation.navigate('Settings');
   };
 
-  // Navigate to transaction history screen
   const navigateToTransactionHistory = () => {
     navigation.navigate('Statements');
   };
 
-  // Navigate to create new payment screen
   const navigateToCreatePayment = () => {
     navigation.navigate('Payments');
   };
 
-  // Navigate to withdraw screen
   const navigateToWithdraw = () => {
     navigation.navigate('Withdraw');
+  };
+
+  const navigateToScanner = () => {
+    navigation.navigate('Scanner');
   };
 
   // Handle transaction selection for details modal
@@ -287,7 +287,7 @@ const DashboardScreen = () => {
         </View>
 
         <View style={styles.cardContainer}>
-          <TouchableOpacity style={styles.terminalCard}>
+          <TouchableOpacity style={styles.terminalCard} onPress={navigateToScanner}>
             <View style={styles.cardHeader}>
               <View style={styles.cardLogo}>
                 <Text style={styles.cardLogoText}>TAPYZE</Text>
