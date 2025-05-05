@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   ScrollView,
   Animated,
-  StatusBar
+  StatusBar,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -47,19 +48,76 @@ const CreatePaymentScreen = () => {
   }, []);
   
   const handleGoBack = () => {
+    // Prevent immediate navigation if a transaction is in progress
     if (paymentStatus === 'processing') {
-      // confirmation dialog
+      // Show a confirmation dialog when trying to go back during processing
+      Alert.alert(
+        "Cancel Transaction?",
+        "A transaction is in progress. Are you sure you want to cancel?",
+        [
+          { 
+            text: "Stay", 
+            style: "cancel" 
+          },
+          { 
+            text: "Cancel Transaction", 
+            onPress: () => {
+              // Stop any ongoing animations and clear timeouts
+              if (processingTimeout) {
+                clearTimeout(processingTimeout);
+                setProcessingTimeout(null);
+              }
+              
+              // Reset the payment state
+              resetPayment();
+              
+              // Navigate back without animation
+              navigation.goBack();
+            } 
+          }
+        ]
+      );
       return;
     }
-    
-    // Animate out before navigating back
-    Animated.timing(scaleAnimation, {
-      toValue: 0.95,
-      duration: 200,
-      useNativeDriver: true
-    }).start(() => {
-      navigation.goBack();
-    });
+    if (paymentStatus === 'success') {
+      Alert.alert(
+        "Leave Payment Screen?",
+        "Do you want to return to the previous screen?",
+        [
+          { 
+            text: "Stay", 
+            style: "cancel" 
+          },
+          { 
+            text: "Go Back", 
+            onPress: () => navigation.goBack() 
+          }
+        ]
+      );
+      return;
+    }
+  
+    if (paymentStatus === 'ready') {
+      Alert.alert(
+        "Cancel Payment?",
+        "Are you sure you want to cancel this payment?",
+        [
+          { 
+            text: "Continue Payment", 
+            style: "cancel" 
+          },
+          { 
+            text: "Cancel", 
+            onPress: () => {
+              nfcAnimation.stopAnimation();
+              navigation.goBack();
+            } 
+          }
+        ]
+      );
+      return;
+    }
+        navigation.goBack();
   };
   
   // amount handlers
@@ -470,15 +528,6 @@ const CreatePaymentScreen = () => {
                 <Text style={styles.buttonText}>New Payment</Text>
               </TouchableOpacity>
             </View>
-            
-            <TouchableOpacity
-              style={styles.homeButton}
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('Dashboard')}
-            >
-              <Ionicons name="home-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.buttonText}>Return to Dashboard</Text>
-            </TouchableOpacity>
           </Animated.View>
         );
       

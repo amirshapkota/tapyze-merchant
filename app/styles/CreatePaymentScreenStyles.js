@@ -390,16 +390,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-  },
-  homeButton: {
-    backgroundColor: '#000001',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginTop: 10,
-  },  
+  }, 
   failedIconCircle: {
     width: 90,
     height: 90,

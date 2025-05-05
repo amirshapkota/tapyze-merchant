@@ -75,11 +75,6 @@ const PaymentStackNavigator = () => {
         component={CreatePaymentScreen} 
         options={{ headerShown: false }}
       />
-      <PaymentStack.Screen 
-        name="Scanner" 
-        component={ScannerScreen} 
-        options={{ headerShown: false }}
-      />
     </PaymentStack.Navigator>
   );
 };
