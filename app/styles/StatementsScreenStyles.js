@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   },
   summaryBox: {
     flex: 1,
-    padding: 15,
+    padding: 12,
     backgroundColor: '#F7F8FA',
     borderRadius: 12,
     marginHorizontal: 5,
@@ -138,11 +138,11 @@ const styles = StyleSheet.create({
   },
   summaryBoxTitle: {
     fontSize: 12,
-    color: '#666',
+    color: '#000',
     marginBottom: 8,
   },
   summaryBoxValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#000000',
   },
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ed7b0e',
   },
   netAmountValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
