@@ -21,7 +21,7 @@ const Tab = createBottomTabNavigator();
 const SettingsStack = createStackNavigator();
 const HomeStack = createStackNavigator();
 const PaymentStack = createStackNavigator();
-const AnalyticsStack = createStackNavigator();
+const ScannerStack = createStackNavigator();
 const StatementsStack = createStackNavigator();
 
 // Settings stack navigator
@@ -61,6 +61,11 @@ const HomeStackNavigator = () => {
         component={DashboardScreen} 
         options={{ headerShown: false }}
       />
+      <HomeStack.Screen 
+        name="Analytics"
+        component={AnalyticsScreen}
+        options={{ headerShown: false }}
+      />
       {/* Add merchant-specific dashboard screens here if needed */}
     </HomeStack.Navigator>
   );
@@ -79,17 +84,16 @@ const PaymentStackNavigator = () => {
   );
 };
 
-// Analytics stack navigator
-const AnalyticsStackNavigator = () => {
+// Scanner stack navigator
+const ScannerStackNavigator = () => {
   return (
-    <AnalyticsStack.Navigator>
-      <AnalyticsStack.Screen 
-        name="AnalyticsMain" 
-        component={AnalyticsScreen} 
+    <ScannerStack.Navigator>
+      <ScannerStack.Screen 
+        name="ScannerMain" 
+        component={ScannerScreen} 
         options={{ headerShown: false }}
       />
-      {/* Add analytics-related screens here if needed */}
-    </AnalyticsStack.Navigator>
+    </ScannerStack.Navigator>
   );
 };
 
@@ -119,8 +123,8 @@ const TabNavigator = () => {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Payments') {
             iconName = focused ? 'cash' : 'cash-outline';
-          } else if (route.name === 'Analytics') {
-            iconName = focused ? 'bar-chart' : 'bar-chart-outline';
+          } else if (route.name === 'Scanner') {
+            iconName = focused ? 'radio' : 'radio-outline';
           } else if (route.name === 'Statements') {
             iconName = focused ? 'document-text' : 'document-text-outline';
           } else if (route.name === 'Settings') {
@@ -157,7 +161,7 @@ const TabNavigator = () => {
     >
       <Tab.Screen name="Home" component={HomeStackNavigator} />
       <Tab.Screen name="Payments" component={PaymentStackNavigator} />
-      <Tab.Screen name="Analytics" component={AnalyticsStackNavigator} />
+      <Tab.Screen name="Scanner" component={ScannerStackNavigator} />
       <Tab.Screen name="Statements" component={StatementsStackNavigator} />
       <Tab.Screen name="Settings" component={SettingsStackNavigator} />
     </Tab.Navigator>

@@ -5,9 +5,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F8FA',
   },
-  scrollViewContent: {
-    paddingBottom: 40,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -40,7 +37,7 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
   },
   screenTitle: {
-    fontSize: 28,
+    fontSize: 24,
     color: '#000000',
     fontWeight: 'bold',
   },

@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
   },
   screenTitle: {
-    fontSize: 28,
+    fontSize: 24,
     color: '#000000',
     fontWeight: 'bold',
   },

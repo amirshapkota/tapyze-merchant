@@ -80,12 +80,12 @@ const DashboardScreen = () => {
 
   // Navigate to transaction history screen
   const navigateToTransactionHistory = () => {
-    navigation.navigate('TransactionHistory');
+    navigation.navigate('Statements');
   };
 
   // Navigate to create new payment screen
   const navigateToCreatePayment = () => {
-    navigation.navigate('CreatePayment');
+    navigation.navigate('Payments');
   };
 
   // Navigate to withdraw screen
@@ -273,7 +273,7 @@ const DashboardScreen = () => {
             <Text style={styles.quickActionTitle}>Analytics</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.quickActionItem}>
+          <TouchableOpacity style={styles.quickActionItem} onPress={navigateToProfile}>
             <View style={styles.quickActionIcon}>
               <Ionicons name="settings-outline" size={24} color="#ed7b0e" />
             </View>

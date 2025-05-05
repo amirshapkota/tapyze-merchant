@@ -62,7 +62,7 @@ const ScannerScreen = () => {
   
   // Navigate to create payment screen
   const navigateToCreatePayment = () => {
-    navigation.navigate('CreatePayment');
+    navigation.navigate('Payments');
   };
 
   return (
