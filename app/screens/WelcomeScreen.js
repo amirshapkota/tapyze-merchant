@@ -52,12 +52,12 @@ const WelcomeScreen = ({ navigation }) => {
     if (currentSlideIndex < slides.length - 1) {
       flatListRef.current.scrollToIndex({ index: currentSlideIndex + 1 });
     } else {
-      navigation.navigate('MerchantAuth');
+      navigation.navigate('Auth');
     }
   };
 
   const handleSkip = () => {
-    navigation.navigate('MerchantAuth');
+    navigation.navigate('Auth');
   };
 
   const renderItem = ({ item }) => {
