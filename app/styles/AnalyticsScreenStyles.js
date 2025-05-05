@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 10,
   },
-  profileButton: {
+  backButton: {
     padding: 5,
   },
   greetingSection: {

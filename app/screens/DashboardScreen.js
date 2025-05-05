@@ -93,6 +93,10 @@ const DashboardScreen = () => {
     navigation.navigate('Scanner');
   };
 
+  const navigateToAnalytics = () => {
+    navigation.navigate('Analytics');
+  };
+
   // Handle transaction selection for details modal
   const handleTransactionSelect = (transaction) => {
     setSelectedTransaction(transaction);
@@ -266,7 +270,7 @@ const DashboardScreen = () => {
             <Text style={styles.quickActionTitle}>Generate QR</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.quickActionItem}>
+          <TouchableOpacity style={styles.quickActionItem} onPress={navigateToAnalytics}>
             <View style={styles.quickActionIcon}>
               <Ionicons name="stats-chart-outline" size={24} color="#ed7b0e" />
             </View>

@@ -100,8 +100,8 @@ const AnalyticsScreen = () => {
   };
   
   // Navigate to profile/settings screen
-  const navigateToProfile = () => {
-    navigation.navigate('Settings');
+  const handleGoBack = () => {
+    navigation.goBack();
   };
 
   // Get the appropriate data based on selected timeframe
@@ -168,11 +168,9 @@ const AnalyticsScreen = () => {
             <Text style={styles.merchantLabel}>ANALYTICS</Text>
           </View>
         </View>
-        <TouchableOpacity 
-          style={styles.profileButton}
-          onPress={navigateToProfile}
-        >
-          <Ionicons name="person-circle-outline" size={40} color="#ed7b0e" />
+        
+        <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
+          <Ionicons name="chevron-back" size={28} color="#000000" />
         </TouchableOpacity>
       </View>
       
