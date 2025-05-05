@@ -142,6 +142,7 @@ const TabNavigator = () => {
           marginTop: 4,
         },
         tabBarStyle: {
+          paddingTop: 5,
           backgroundColor: 'white',
           paddingVertical: 12,
           paddingHorizontal: 15,
@@ -170,7 +171,7 @@ const TabNavigator = () => {
 
 function App() {
   // Simple auth state management for testing
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   return (
     <NavigationContainer>
