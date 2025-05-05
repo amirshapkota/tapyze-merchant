@@ -28,32 +28,32 @@ const MerchantEditProfileScreen = ({ navigation, route }) => {
   // Handle save changes
   const handleSaveChanges = () => {
     // Validate inputs
-    if (!businessName.trim()) {
+    if (!businessName?.trim()) {
       Alert.alert("Error", "Business name cannot be empty");
       return;
     }
     
-    if (!ownerName.trim()) {
+    if (!ownerName?.trim()) {
       Alert.alert("Error", "Owner name cannot be empty");
       return;
     }
     
-    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
+    if (!email?.trim() || !/\S+@\S+\.\S+/.test(email)) {
       Alert.alert("Error", "Please enter a valid email address");
       return;
     }
     
-    if (!phone.trim()) {
+    if (!phone?.trim()) {
       Alert.alert("Error", "Phone number cannot be empty");
       return;
     }
     
-    if (!address.trim()) {
+    if (!address?.trim()) {
       Alert.alert("Error", "Business address cannot be empty");
       return;
     }
     
-    if (!businessType.trim()) {
+    if (!businessType?.trim()) {
       Alert.alert("Error", "Business type cannot be empty");
       return;
     }

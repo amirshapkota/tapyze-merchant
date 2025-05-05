@@ -87,7 +87,7 @@ const MerchantSettingsScreen = () => {
               <Text style={styles.profileName}>{merchantProfile.businessName}</Text>
               <Text style={styles.profileType}>Merchant ID: {merchantProfile.merchantID}</Text>
             </View>
-            <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditBusinessProfile', { merchantProfile })} >
+            <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditProfile', { merchantProfile })} >
               <Ionicons name="pencil" size={20} color="#ed7b0e" />
             </TouchableOpacity>
           </View>
