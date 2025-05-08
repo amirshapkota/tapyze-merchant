@@ -17,21 +17,21 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     marginTop: height * 0.06,
-    marginBottom: height * 0.04,
+    marginBottom: height * 0.02, 
   },
   logo: {
-    width: width * 0.4,
-    height: width * 0.4,
-    marginBottom: 20,
+    width: width * 0.3,
+    height: width * 0.3,
+    marginBottom: 15, 
   },
   welcomeText: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#000000',
-    marginBottom: 10,
+    marginBottom: 8, 
   },
   subtitleText: {
-    fontSize: 16,
+    fontSize: 15, 
     color: '#333333',
     textAlign: 'center',
     marginHorizontal: 30,
@@ -41,20 +41,20 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 16, 
   },
   inputLabel: {
     fontSize: 14,
     color: '#333333',
-    marginBottom: 8,
+    marginBottom: 6,
     fontWeight: '500',
   },
   input: {
     backgroundColor: '#f5f5f5',
     borderRadius: 10,
     paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: 10,
+    fontSize: 15, 
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#ff3b30',
     fontSize: 12,
-    marginTop: 5,
+    marginTop: 3,
     marginLeft: 5,
   },
   passwordContainer: {
@@ -78,15 +78,15 @@ const styles = StyleSheet.create({
   passwordInput: {
     flex: 1,
     paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: 10,
+    fontSize: 15, 
   },
   eyeIcon: {
-    padding: 10,
+    padding: 8, 
   },
   forgotPasswordContainer: {
     alignSelf: 'flex-end',
-    marginBottom: 25,
+    marginBottom: 20,
   },
   forgotPasswordText: {
     color: '#ed7b0e',
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: '#ed7b0e',
     borderRadius: 10,
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: 'center',
     elevation: 3,
     shadowColor: '#ed7b0e',
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   orContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 16, 
   },
   divider: {
     flex: 1,
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#ffffff',
     borderRadius: 10,
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -145,21 +145,21 @@ const styles = StyleSheet.create({
   },
   googleButtonText: {
     color: '#333333',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
   },
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 30,
+    marginTop: 25, 
   },
   toggleText: {
     color: '#333333',
-    fontSize: 15,
+    fontSize: 14,
   },
   toggleButtonText: {
     color: '#ed7b0e',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
 });
