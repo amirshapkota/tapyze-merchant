@@ -26,6 +26,14 @@ const AuthScreen = ({ navigation }) => {
   const [passwordError, setPasswordError] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [businessNameError, setBusinessNameError] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerNameError, setOwnerNameError] = useState('');
+  const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  const [businessAddressError, setBusinessAddressError] = useState('');
+  const [businessType, setBusinessType] = useState('');
+  const [businessTypeError, setBusinessTypeError] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -35,6 +43,10 @@ const AuthScreen = ({ navigation }) => {
     email: false,
     password: false,
     businessName: false,
+    ownerName: false,
+    phone: false,
+    businessAddress: false,
+    businessType: false,
     confirmPassword: false
   });
 
@@ -43,7 +55,7 @@ const AuthScreen = ({ navigation }) => {
     if (Object.values(isInputTouched).some(field => field)) {
       validateForm();
     }
-  }, [email, password, confirmPassword, businessName, isLoginMode, isInputTouched]);
+  }, [email, password, confirmPassword, businessName, ownerName, phone, businessAddress, businessType, isLoginMode, isInputTouched]);
   
   // Email validation
   const validateEmail = (text) => {
@@ -92,6 +104,65 @@ const AuthScreen = ({ navigation }) => {
     return true;
   };
 
+  // Owner name validation
+  const validateOwnerName = (text) => {
+    if (!isLoginMode && isInputTouched.ownerName) {
+      if (!text) {
+        setOwnerNameError('Owner name is required');
+        return false;
+      } else {
+        setOwnerNameError('');
+        return true;
+      }
+    }
+    return true;
+  };
+
+  // Phone validation
+  const validatePhone = (text) => {
+    if (!isLoginMode && isInputTouched.phone) {
+      if (!text) {
+        setPhoneError('Phone number is required');
+        return false;
+      } else if (!/^\d{10}$/.test(text.replace(/\D/g, ''))) {
+        setPhoneError('Please enter a valid 10-digit phone number');
+        return false;
+      } else {
+        setPhoneError('');
+        return true;
+      }
+    }
+    return true;
+  };
+
+  // Business address validation
+  const validateBusinessAddress = (text) => {
+    if (!isLoginMode && isInputTouched.businessAddress) {
+      if (!text) {
+        setBusinessAddressError('Business address is required');
+        return false;
+      } else {
+        setBusinessAddressError('');
+        return true;
+      }
+    }
+    return true;
+  };
+
+  // Business type validation
+  const validateBusinessType = (text) => {
+    if (!isLoginMode && isInputTouched.businessType) {
+      if (!text) {
+        setBusinessTypeError('Business type is required');
+        return false;
+      } else {
+        setBusinessTypeError('');
+        return true;
+      }
+    }
+    return true;
+  };
+
   // Confirm password validation
   const validateConfirmPassword = (text) => {
     if (!isLoginMode && isInputTouched.confirmPassword) {
@@ -118,8 +189,22 @@ const AuthScreen = ({ navigation }) => {
       setIsFormValid(isEmailValid && isPasswordValid);
     } else {
       const isBusinessNameValid = validateBusinessName(businessName);
+      const isOwnerNameValid = validateOwnerName(ownerName);
+      const isPhoneValid = validatePhone(phone);
+      const isBusinessAddressValid = validateBusinessAddress(businessAddress);
+      const isBusinessTypeValid = validateBusinessType(businessType);
       const isConfirmPasswordValid = validateConfirmPassword(confirmPassword);
-      setIsFormValid(isEmailValid && isPasswordValid && isBusinessNameValid && isConfirmPasswordValid);
+      
+      setIsFormValid(
+        isEmailValid && 
+        isPasswordValid && 
+        isBusinessNameValid && 
+        isOwnerNameValid && 
+        isPhoneValid && 
+        isBusinessAddressValid &&
+        isBusinessTypeValid &&
+        isConfirmPasswordValid
+      );
     }
   };
 
@@ -132,6 +217,14 @@ const AuthScreen = ({ navigation }) => {
     setPasswordError('');
     setBusinessName('');
     setBusinessNameError('');
+    setOwnerName('');
+    setOwnerNameError('');
+    setPhone('');
+    setPhoneError('');
+    setBusinessAddress('');
+    setBusinessAddressError('');
+    setBusinessType('');
+    setBusinessTypeError('');
     setConfirmPassword('');
     setConfirmPasswordError('');
     // Reset touched states
@@ -139,6 +232,10 @@ const AuthScreen = ({ navigation }) => {
       email: false,
       password: false,
       businessName: false,
+      ownerName: false,
+      phone: false,
+      businessAddress: false,
+      businessType: false,
       confirmPassword: false
     });
   };
@@ -149,6 +246,10 @@ const AuthScreen = ({ navigation }) => {
       email: true,
       password: true,
       businessName: true,
+      ownerName: true,
+      phone: true,
+      businessAddress: true,
+      businessType: true,
       confirmPassword: true
     });
     
@@ -168,11 +269,32 @@ const AuthScreen = ({ navigation }) => {
       }
     } else {
       const isBusinessNameValid = validateBusinessName(businessName);
+      const isOwnerNameValid = validateOwnerName(ownerName);
+      const isPhoneValid = validatePhone(phone);
+      const isBusinessAddressValid = validateBusinessAddress(businessAddress);
+      const isBusinessTypeValid = validateBusinessType(businessType);
       const isConfirmPasswordValid = validateConfirmPassword(confirmPassword);
       
-      if (isEmailValid && isPasswordValid && isBusinessNameValid && isConfirmPasswordValid) {
+      if (
+        isEmailValid && 
+        isPasswordValid && 
+        isBusinessNameValid && 
+        isOwnerNameValid && 
+        isPhoneValid && 
+        isBusinessAddressValid &&
+        isBusinessTypeValid &&
+        isConfirmPasswordValid
+      ) {
         // Handle signup logic
-        console.log('Signup with:', businessName, email, password);
+        console.log('Signup with:', {
+          businessName,
+          ownerName,
+          email,
+          phone,
+          businessAddress,
+          businessType,
+          password
+        });
         // Navigate to main app or verification screen after successful signup
         // navigation.navigate('Dashboard');
         Alert.alert('Success', 'Account created successfully');
@@ -184,6 +306,29 @@ const AuthScreen = ({ navigation }) => {
 
   const dismissKeyboard = () => {
     Keyboard.dismiss();
+  };
+
+  // Format phone number as user types
+  const formatPhoneNumber = (text) => {
+    // Strip all non-numeric characters
+    const cleaned = text.replace(/\D/g, '');
+    
+    // Limit to 10 digits
+    const limited = cleaned.substring(0, 10);
+    
+    // Format: (XXX) XXX-XXXX
+    let formatted = limited;
+    if (limited.length > 0) {
+      formatted = limited.replace(/(\d{3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3) => {
+        let result = '';
+        if (p1) result += `(${p1}`;
+        if (p2) result += `) ${p2}`;
+        if (p3) result += `-${p3}`;
+        return result;
+      });
+    }
+    
+    return formatted;
   };
 
   return (
@@ -217,25 +362,107 @@ const AuthScreen = ({ navigation }) => {
 
             <View style={styles.formContainer}>
               {!isLoginMode && (
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Business Name</Text>
-                  <TextInput
-                    style={[styles.input, businessNameError ? styles.inputError : null]}
-                    placeholder="Your business name"
-                    value={businessName}
-                    onChangeText={(text) => {
-                      setBusinessName(text);
-                    }}
-                    onBlur={() => {
-                      setIsInputTouched({...isInputTouched, businessName: true});
-                      validateBusinessName(businessName);
-                    }}
-                    autoCapitalize="words"
-                  />
-                  {businessNameError ? (
-                    <Text style={styles.errorText}>{businessNameError}</Text>
-                  ) : null}
-                </View>
+                <>
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Business Name</Text>
+                    <TextInput
+                      style={[styles.input, businessNameError ? styles.inputError : null]}
+                      placeholder="Your business name"
+                      value={businessName}
+                      onChangeText={(text) => {
+                        setBusinessName(text);
+                      }}
+                      onBlur={() => {
+                        setIsInputTouched({...isInputTouched, businessName: true});
+                        validateBusinessName(businessName);
+                      }}
+                      autoCapitalize="words"
+                    />
+                    {businessNameError ? (
+                      <Text style={styles.errorText}>{businessNameError}</Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Owner Name</Text>
+                    <TextInput
+                      style={[styles.input, ownerNameError ? styles.inputError : null]}
+                      placeholder="Full name of business owner"
+                      value={ownerName}
+                      onChangeText={(text) => {
+                        setOwnerName(text);
+                      }}
+                      onBlur={() => {
+                        setIsInputTouched({...isInputTouched, ownerName: true});
+                        validateOwnerName(ownerName);
+                      }}
+                      autoCapitalize="words"
+                    />
+                    {ownerNameError ? (
+                      <Text style={styles.errorText}>{ownerNameError}</Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Phone Number</Text>
+                    <TextInput
+                      style={[styles.input, phoneError ? styles.inputError : null]}
+                      placeholder="(123) 456-7890"
+                      value={phone}
+                      onChangeText={(text) => {
+                        setPhone(formatPhoneNumber(text));
+                      }}
+                      onBlur={() => {
+                        setIsInputTouched({...isInputTouched, phone: true});
+                        validatePhone(phone);
+                      }}
+                      keyboardType="phone-pad"
+                    />
+                    {phoneError ? (
+                      <Text style={styles.errorText}>{phoneError}</Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Business Address</Text>
+                    <TextInput
+                      style={[styles.input, businessAddressError ? styles.inputError : null]}
+                      placeholder="Full address of your business"
+                      value={businessAddress}
+                      onChangeText={(text) => {
+                        setBusinessAddress(text);
+                      }}
+                      onBlur={() => {
+                        setIsInputTouched({...isInputTouched, businessAddress: true});
+                        validateBusinessAddress(businessAddress);
+                      }}
+                      autoCapitalize="words"
+                    />
+                    {businessAddressError ? (
+                      <Text style={styles.errorText}>{businessAddressError}</Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Business Type</Text>
+                    <TextInput
+                      style={[styles.input, businessTypeError ? styles.inputError : null]}
+                      placeholder="e.g. Restaurant, Retail, Services"
+                      value={businessType}
+                      onChangeText={(text) => {
+                        setBusinessType(text);
+                      }}
+                      onBlur={() => {
+                        setIsInputTouched({...isInputTouched, businessType: true});
+                        validateBusinessType(businessType);
+                      }}
+                      autoCapitalize="words"
+                    />
+                    {businessTypeError ? (
+                      <Text style={styles.errorText}>{businessTypeError}</Text>
+                    ) : null}
+                  </View>
+                </>
               )}
 
               <View style={styles.inputContainer}>
