@@ -15,6 +15,7 @@ import SettingsScreen from './app/screens/SettingsScreen';
 import EditProfileScreen from './app/screens/EditProfileScreen';
 import ChangePasswordScreen from './app/screens/ChangePasswordScreen';
 import ForgotPasswordScreen from './app/screens/ForgotPasswordScreen';
+import WifiSetupScreen from './app/screens/WifiSetupScreen.js';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -91,6 +92,11 @@ const ScannerStackNavigator = () => {
       <ScannerStack.Screen 
         name="ScannerMain" 
         component={ScannerScreen} 
+        options={{ headerShown: false }}
+      />
+      <ScannerStack.Screen
+        name="WifiSetup"
+        component={WifiSetupScreen}
         options={{ headerShown: false }}
       />
     </ScannerStack.Navigator>
@@ -170,7 +176,7 @@ const TabNavigator = () => {
 
 function App() {
   // Simple auth state management for testing
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   return (
     <NavigationContainer>

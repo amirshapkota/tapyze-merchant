@@ -9,7 +9,6 @@ const styles = StyleSheet.create({
   scrollViewContent: {
     paddingBottom: 30,
   },
-  // Header styles - Identical to Dashboard
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -237,7 +236,6 @@ const styles = StyleSheet.create({
   statusDisconnected: {
     backgroundColor: '#FF3B30',
   },
-  // New styles for single Accept Payment button
   paymentActionContainer: {
     paddingHorizontal: 15,
     marginBottom: 25,
@@ -266,6 +264,32 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   paymentActionTitle: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
+ wifiActionContainer: {
+    paddingHorizontal: 15,
+  },
+ wifiActionButton: {
+    backgroundColor: '#000',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+  },
+ wifiActionIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 15,
+  },
+ wifiActionTitle: {
     fontSize: 18,
     color: '#FFFFFF',
     fontWeight: 'bold',

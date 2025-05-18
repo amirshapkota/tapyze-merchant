@@ -215,6 +215,18 @@ const ScannerScreen = () => {
             <Text style={styles.helpButtonText}>View Troubleshooting Guide</Text>
           </TouchableOpacity>
         </View>
+        
+        <View style={styles.wifiActionContainer}>
+          <TouchableOpacity 
+            style={styles.wifiActionButton}
+            onPress={() => navigation.navigate('WifiSetup')}
+          >
+            <View style={styles.wifiActionIcon}>
+              <Ionicons name="wifi-outline" size={28} color="#FFFFFF" />
+            </View>
+            <Text style={styles.wifiActionTitle}>Connect Scanner to Wifi</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
