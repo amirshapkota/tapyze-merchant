@@ -133,7 +133,7 @@ export default function WifiSetupScreen() {
           <Text style={styles.helpText}>
             1. Make sure your phone is connected to the "TapyzeSetup" WiFi network{'\n'}
             2. Enter your home/business WiFi credentials above{'\n'}
-            3. Tap "Send WiFi Credentials" to configure the scanner{'\n'}
+            3. Tap "Connect Device" to configure the scanner{'\n'}
             4. After sending, switch back to your regular WiFi network{'\n'}
             5. The app will automatically find the scanner on your network
           </Text>

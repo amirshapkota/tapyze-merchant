@@ -269,6 +269,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
+manualIpButtonContainer: {
+    paddingHorizontal: 15,
+    marginBottom: 15,
+  },
+  manualIpButton: {
+    borderWidth: 1,
+    borderColor: '#ed7b0e',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  manualIpButtonText: {
+    fontSize: 16,
+    color: '#ed7b0e',
+    fontWeight: '600',
+  },
 
  wifiActionContainer: {
     paddingHorizontal: 15,
