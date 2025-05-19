@@ -20,16 +20,20 @@ const CreatePaymentScreen = () => {
   const CURRENCY = 'Rs.';
   const MIN_AMOUNT = 0;
   const MAX_TRANSACTION_TIMEOUT = 30000; // 30 seconds timeout for transactions
+  const PIN_LENGTH = 4; // Standard PIN length
   
   const navigation = useNavigation();
   const nfcAnimation = useRef(new Animated.Value(1)).current;
   const scaleAnimation = useRef(new Animated.Value(0.95)).current;
   
   const [amount, setAmount] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState('initial'); // 'initial', 'ready', 'processing', 'success', 'failed'
+  const [paymentStatus, setPaymentStatus] = useState('initial'); // 'initial', 'ready', 'enterPin', 'processing', 'success', 'failed'
   const [errorMessage, setErrorMessage] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [processingTimeout, setProcessingTimeout] = useState(null);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [cardType, setCardType] = useState('TAPYZE Card'); // Default card type, could be updated from NFC read
   
   useEffect(() => {
     // Animate card scaling on mount
@@ -97,7 +101,7 @@ const CreatePaymentScreen = () => {
       return;
     }
   
-    if (paymentStatus === 'ready') {
+    if (paymentStatus === 'ready' || paymentStatus === 'enterPin') {
       Alert.alert(
         "Cancel Payment?",
         "Are you sure you want to cancel this payment?",
@@ -117,11 +121,22 @@ const CreatePaymentScreen = () => {
       );
       return;
     }
-        navigation.goBack();
+    
+    navigation.goBack();
   };
   
   // amount handlers
   const handleNumberPress = (number) => {
+    // If in PIN entry mode, handle PIN input
+    if (paymentStatus === 'enterPin') {
+      if (pin.length < PIN_LENGTH) {
+        setPin(pin + number);
+        setPinError('');
+      }
+      return;
+    }
+    
+    // Else handle amount input
     // If amount already has two decimal places, don't add more digits
     if (amount.includes('.') && amount.split('.')[1].length >= 2) {
       return;
@@ -157,12 +172,25 @@ const CreatePaymentScreen = () => {
   };
   
   const handleBackspace = () => {
+    if (paymentStatus === 'enterPin') {
+      if (pin.length > 0) {
+        setPin(pin.slice(0, -1));
+      }
+      return;
+    }
+    
     if (amount.length > 0) {
       setAmount(amount.slice(0, -1));
     }
   };
   
   const handleClear = () => {
+    if (paymentStatus === 'enterPin') {
+      setPin('');
+      setPinError('');
+      return;
+    }
+    
     setAmount('');
     setErrorMessage('');
   };
@@ -209,15 +237,37 @@ const CreatePaymentScreen = () => {
     ).start();
   };
   
-  // Process payment - in production, this would connect to NFC hardware
+  // Simulate card detection - in production, this would come from NFC hardware
+  const handleCardDetected = () => {
+    // Transition to PIN entry state
+    setPaymentStatus('enterPin');
+    
+    // Stop NFC animation
+    nfcAnimation.stopAnimation();
+    
+    // Clear PIN if any
+    setPin('');
+    setPinError('');
+  };
+  
+  // Handle PIN submission
+  const handlePinSubmit = () => {
+    if (pin.length !== PIN_LENGTH) {
+      setPinError(`Please enter ${PIN_LENGTH} digit PIN`);
+      return;
+    }
+    
+    // In production: Verify PIN with payment processor
+    // For demo: Just proceed with payment processing
+    processPayment();
+  };
+  
+  // Process payment - in production, this would connect to payment processor
   const processPayment = () => {
     // Transition to processing state
     setPaymentStatus('processing');
     
-    // Stop animation
-    nfcAnimation.stopAnimation();
-    
-    // In production: Initialize NFC reader and process payment here
+    // In production: Send payment request to processor with PIN
     // For demo: Simulate processing with timeout
     const timeout = setTimeout(() => {
       // Generate transaction ID
@@ -260,6 +310,8 @@ const CreatePaymentScreen = () => {
     setAmount('');
     setErrorMessage('');
     setTransactionId('');
+    setPin('');
+    setPinError('');
   };
     
   const renderAmountDisplay = () => {
@@ -281,6 +333,33 @@ const CreatePaymentScreen = () => {
     );
   };
   
+  const renderPinDisplay = () => {
+    return (
+      <View style={styles.pinDisplayContainer}>
+        <Text style={styles.pinLabel}>Enter PIN</Text>
+        
+        <View style={styles.pinDotsContainer}>
+          {Array(PIN_LENGTH).fill(0).map((_, index) => (
+            <View 
+              key={`pin-dot-${index}`} 
+              style={[
+                styles.pinDot,
+                pin.length > index ? styles.pinDotFilled : {}
+              ]}
+            />
+          ))}
+        </View>
+        
+        {pinError ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={16} color="#FF3B30" />
+            <Text style={styles.errorText}>{pinError}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+  
   const renderNumberPad = () => {
     // Keypad layout with positions
     const keys = [
@@ -290,20 +369,31 @@ const CreatePaymentScreen = () => {
       { value: '.' }, { value: '0' }, { value: 'del', icon: 'backspace-outline' }
     ];
     
+    // For PIN entry, don't allow decimal point
+    if (paymentStatus === 'enterPin') {
+      keys[9] = { value: '', disabled: true };
+    }
+    
     return (
       <View style={styles.numberPad}>
         {keys.map((key, index) => (
           <TouchableOpacity
             key={`key-${index}`}
-            style={styles.numberKey}
-            activeOpacity={0.7}
+            style={[
+              styles.numberKey,
+              key.disabled ? styles.disabledKey : {}
+            ]}
+            activeOpacity={key.disabled ? 1 : 0.7}
             onPress={() => {
+              if (key.disabled) return;
+              
               if (key.value === 'del') {
                 handleBackspace();
               } else {
                 handleNumberPress(key.value.toString());
               }
             }}
+            disabled={key.disabled}
           >
             {key.icon ? (
               <Ionicons name={key.icon} size={24} color="#000" />
@@ -412,10 +502,10 @@ const CreatePaymentScreen = () => {
               <TouchableOpacity
                 style={styles.devButton}
                 activeOpacity={0.7}
-                onPress={processPayment}
+                onPress={handleCardDetected}
               >
                 <Text style={styles.devButtonText}>
-                  [DEV] Simulate Payment Process
+                  [DEV] Simulate Card Detection
                 </Text>
               </TouchableOpacity>
             )}
@@ -428,6 +518,62 @@ const CreatePaymentScreen = () => {
               <Ionicons name="close-outline" size={20} color="#FFFFFF" />
               <Text style={styles.buttonText}>Cancel Transaction</Text>
             </TouchableOpacity>
+          </Animated.View>
+        );
+      
+      case 'enterPin':
+        return (
+          <Animated.View 
+            style={[
+              styles.paymentCard,
+              { transform: [{ scale: scaleAnimation }] }
+            ]}
+          >
+            <View style={[styles.cardDetectedInfo, { marginTop: 0, paddingTop: 10 }]}>
+              <View style={styles.cardIconContainer}>
+                <Ionicons name="card" size={32} color="#4CAF50" />
+                <View style={styles.cardCheckmark}>
+                  <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                </View>
+              </View>
+              <Text style={styles.cardDetectedText}>Card Detected</Text>
+              <Text style={styles.cardTypeText}>{cardType}</Text>
+            </View>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Enter PIN</Text>
+              <Text style={styles.cardSubtitle}>Please enter your 4-digit PIN to complete payment</Text>
+            </View>
+            <View style={styles.amountSummary}>
+              <Text style={styles.amountLabel}>Amount to Pay:</Text>
+              <Text style={styles.summaryAmount}>{CURRENCY} {formatAmount(amount)}</Text>
+            </View>
+            
+            {renderPinDisplay()}
+            {renderNumberPad()}
+            
+            <View style={styles.actionContainer}>
+              <TouchableOpacity
+                style={styles.clearButton}
+                activeOpacity={0.8}
+                onPress={handleClear}
+              >
+                <Ionicons name="refresh-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Clear PIN</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.nextButton,
+                  (pin.length !== PIN_LENGTH) ? styles.disabledButton : {}
+                ]}
+                activeOpacity={0.8}
+                onPress={handlePinSubmit}
+                disabled={pin.length !== PIN_LENGTH}
+              >
+                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         );
       
@@ -455,7 +601,7 @@ const CreatePaymentScreen = () => {
                   {CURRENCY} {formatAmount(amount)}
                 </Text>
                 <Text style={styles.processingSubtext}>
-                  Keep card or device near the reader
+                  Please do not remove your card
                 </Text>
               </View>
             </View>
@@ -507,7 +653,7 @@ const CreatePaymentScreen = () => {
               
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Payment Method</Text>
-                <Text style={styles.detailValue}>TAPYZE Card</Text>
+                <Text style={styles.detailValue}>{cardType}</Text>
               </View>
               
               <View style={styles.detailRow}>
@@ -627,7 +773,7 @@ const CreatePaymentScreen = () => {
         <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
             <Ionicons name="chevron-back" size={28} color="#000000" />
         </TouchableOpacity>
-        </View>
+      </View>
 
       {/* Title Section */}
       <View style={styles.titleSection}>
@@ -635,6 +781,7 @@ const CreatePaymentScreen = () => {
         <Text style={styles.screenSubtitle}>
           {paymentStatus === 'initial' ? 'Enter amount to create a new transaction' :
            paymentStatus === 'ready' ? 'Ready to accept contactless payment' :
+           paymentStatus === 'enterPin' ? 'Card detected - Enter PIN to complete payment' :
            paymentStatus === 'processing' ? 'Processing your transaction' :
            paymentStatus === 'success' ? 'Payment completed successfully' :
            'Transaction could not be completed'}

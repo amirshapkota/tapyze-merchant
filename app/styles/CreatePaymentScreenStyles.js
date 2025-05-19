@@ -447,7 +447,74 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-  }
+  },
+  // Pin display and input styles
+pinDisplayContainer: {
+  width: '100%',
+  marginBottom: 20,
+  alignItems: 'center',
+},
+pinLabel: {
+  fontSize: 16,
+  color: '#555',
+  marginBottom: 15,
+  fontWeight: '500',
+},
+pinDotsContainer: {
+  flexDirection: 'row',
+  justifyContent: 'center',
+  marginBottom: 10,
+},
+pinDot: {
+  width: 16,
+  height: 16,
+  borderRadius: 8,
+  backgroundColor: '#E0E0E0',
+  marginHorizontal: 8,
+  borderWidth: 1,
+  borderColor: '#CCCCCC',
+},
+pinDotFilled: {
+  backgroundColor: '#2C3E50',
+  borderColor: '#2C3E50',
+},
+
+// Card detected styles
+cardDetectedInfo: {
+  alignItems: 'center',
+  marginBottom: 15,
+  paddingBottom: 15,
+  borderBottomWidth: 1,
+  borderColor: '#E0E0E0',
+},
+cardIconContainer: {
+  position: 'relative',
+  marginBottom: 10,
+},
+cardCheckmark: {
+  position: 'absolute',
+  right: -5,
+  bottom: -5,
+  backgroundColor: '#FFFFFF',
+  borderRadius: 10,
+  overflow: 'hidden',
+},
+cardDetectedText: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#4CAF50',
+  marginBottom: 5,
+},
+cardTypeText: {
+  fontSize: 14,
+  color: '#555555',
+},
+
+// Keypad modifications
+disabledKey: {
+  opacity: 0.3,
+},
+  
 });
 
 export default styles;
