@@ -574,6 +574,14 @@ const CreatePaymentScreen = () => {
                 <Text style={styles.buttonText}>Confirm</Text>
               </TouchableOpacity>
             </View>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              activeOpacity={0.8}
+              onPress={resetPayment}
+            >
+              <Ionicons name="close-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.buttonText}>Cancel Transaction</Text>
+            </TouchableOpacity>
           </Animated.View>
         );
       
@@ -601,7 +609,7 @@ const CreatePaymentScreen = () => {
                   {CURRENCY} {formatAmount(amount)}
                 </Text>
                 <Text style={styles.processingSubtext}>
-                  Please do not remove your card
+                  Please wait...
                 </Text>
               </View>
             </View>
