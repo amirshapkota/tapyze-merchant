@@ -16,6 +16,7 @@ import EditProfileScreen from './app/screens/EditProfileScreen';
 import ChangePasswordScreen from './app/screens/ChangePasswordScreen';
 import ForgotPasswordScreen from './app/screens/ForgotPasswordScreen';
 import WifiSetupScreen from './app/screens/WifiSetupScreen.js';
+import WithdrawScreen from './app/screens/WithDrawScreen.js';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -65,6 +66,11 @@ const HomeStackNavigator = () => {
       <HomeStack.Screen 
         name="Analytics"
         component={AnalyticsScreen}
+        options={{ headerShown: false }}
+      />
+      <HomeStack.Screen
+        name="Withdraw"
+        component={WithdrawScreen}
         options={{ headerShown: false }}
       />
       {/* Add merchant-specific dashboard screens here if needed */}
