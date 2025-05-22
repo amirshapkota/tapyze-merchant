@@ -570,23 +570,6 @@ const AuthScreen = ({ navigation }) => {
                   {isLoginMode ? 'Sign In' : 'Create Account'}
                 </Text>
               </TouchableOpacity>
-
-              <View style={styles.orContainer}>
-                <View style={styles.divider} />
-                <Text style={styles.orText}>OR</Text>
-                <View style={styles.divider} />
-              </View>
-
-              <TouchableOpacity style={styles.googleButton}>
-                <Image 
-                  source={require('../assets/google-icon.png')} 
-                  style={styles.googleIcon}
-                  resizeMode="contain"
-                />
-                <Text style={styles.googleButtonText}>
-                  {isLoginMode ? 'Sign in with Google' : 'Sign up with Google'}
-                </Text>
-              </TouchableOpacity>
             </View>
 
             <View style={styles.toggleContainer}>
