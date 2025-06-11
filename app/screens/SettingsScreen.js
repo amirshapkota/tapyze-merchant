@@ -1,26 +1,29 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, SafeAreaView, Switch, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, SafeAreaView, Switch, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import styles from '../styles/SettingsScreenStyles';
 
 import { useNavigation } from '@react-navigation/native';
+import { useMerchantAuth } from '../context/MerchantAuthContext';
 
 const MerchantSettingsScreen = () => {
+  const navigation = useNavigation();
+  const { user, logout, isLoading } = useMerchantAuth();
+  
   // State for toggle settings
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoWithdrawalEnabled, setAutoWithdrawalEnabled] = useState(false);
   const [receiptEmailEnabled, setReceiptEmailEnabled] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const navigation = useNavigation();
-  
-  // Merchant profile info
+  // Use actual user data from context, with fallback for testing
   const merchantProfile = {
-    businessName: "Coffee Shop",
-    ownerName: "John Smith",
-    email: "john@coffeeshop.com",
-    phone: "+977 9801234567",
-    memberSince: 'April 2023',
-    merchantID: 'TPZ-78245'
+    businessName: user?.businessName,
+    ownerName: user?.ownerName,
+    email: user?.email,
+    phone: user?.phone,
+    memberSince: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'April 2023',
+    merchantID: user?._id ? `TPZ-${user._id.slice(-5).toUpperCase()}` : 'TPZ-78245'
   };
 
   // Handle logout
@@ -30,9 +33,63 @@ const MerchantSettingsScreen = () => {
       "Are you sure you want to logout?",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Logout", onPress: () => console.log("Logout pressed"), style: "destructive" }
+        { 
+          text: "Logout", 
+          onPress: performLogout, 
+          style: "destructive" 
+        }
       ]
     );
+  };
+
+  // Perform the actual logout
+  const performLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      
+      const result = await logout();
+      
+      if (result.success) {
+        // Show success message briefly
+        Alert.alert(
+          "Logged Out",
+          "You have been successfully logged out.",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Navigation will be handled automatically by AuthContext
+                // The app will switch to AuthStackNavigator
+              }
+            }
+          ]
+        );
+      } else {
+        // Handle logout failure
+        Alert.alert(
+          "Logout Failed",
+          result.message || "Failed to logout. Please try again.",
+          [
+            {
+              text: "OK"
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert(
+        "Error",
+        "An error occurred while logging out. Please try again.",
+        [
+          {
+            text: "OK"
+          }
+        ]
+      );
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   // Handle account deletion
@@ -87,7 +144,11 @@ const MerchantSettingsScreen = () => {
               <Text style={styles.profileName}>{merchantProfile.businessName}</Text>
               <Text style={styles.profileType}>Merchant ID: {merchantProfile.merchantID}</Text>
             </View>
-            <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditProfile', { merchantProfile })} >
+            <TouchableOpacity 
+              style={styles.editButton} 
+              onPress={() => navigation.navigate('EditProfile', { merchantProfile })}
+              disabled={isLoading || isLoggingOut}
+            >
               <Ionicons name="pencil" size={20} color="#ed7b0e" />
             </TouchableOpacity>
           </View>
@@ -126,10 +187,14 @@ const MerchantSettingsScreen = () => {
               thumbColor={notificationsEnabled ? "#ed7b0e" : "#f4f3f4"}
               onValueChange={() => setNotificationsEnabled(prev => !prev)}
               value={notificationsEnabled}
+              disabled={isLoading || isLoggingOut}
             />
           </View>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            disabled={isLoading || isLoggingOut}
+          >
             <View style={styles.settingInfo}>
               <Ionicons name="language-outline" size={24} color="#333" />
               <Text style={styles.settingText}>Language</Text>
@@ -140,7 +205,10 @@ const MerchantSettingsScreen = () => {
             </View>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            disabled={isLoading || isLoggingOut}
+          >
             <View style={styles.settingInfo}>
               <Ionicons name="cash-outline" size={24} color="#333" />
               <Text style={styles.settingText}>Currency</Text>
@@ -155,7 +223,10 @@ const MerchantSettingsScreen = () => {
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Payment Settings</Text>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            disabled={isLoading || isLoggingOut}
+          >
             <View style={styles.settingInfo}>
               <Ionicons name="card-outline" size={24} color="#333" />
               <Text style={styles.settingText}>Bank Account Details</Text>
@@ -167,7 +238,11 @@ const MerchantSettingsScreen = () => {
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Security</Text>
           
-          <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('ChangePassword')}>
+          <TouchableOpacity 
+            style={styles.settingItem} 
+            onPress={() => navigation.navigate('ChangePassword')}
+            disabled={isLoading || isLoggingOut}
+          >
             <View style={styles.settingInfo}>
               <Ionicons name="lock-closed-outline" size={24} color="#333" />
               <Text style={styles.settingText}>Change Password</Text>
@@ -175,7 +250,10 @@ const MerchantSettingsScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#AAAAAA" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            disabled={isLoading || isLoggingOut}
+          >
             <View style={styles.settingInfo}>
               <Ionicons name="shield-checkmark-outline" size={24} color="#333" />
               <Text style={styles.settingText}>Two-Factor Authentication</Text>
@@ -183,39 +261,14 @@ const MerchantSettingsScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#AAAAAA" />
           </TouchableOpacity>
         </View>
-{/* 
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Business Settings</Text>
-          
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="storefront-outline" size={24} color="#333" />
-              <Text style={styles.settingText}>Store Information</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#AAAAAA" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="people-outline" size={24} color="#333" />
-              <Text style={styles.settingText}>Staff Management</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#AAAAAA" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="receipt-outline" size={24} color="#333" />
-              <Text style={styles.settingText}>Receipt Templates</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#AAAAAA" />
-          </TouchableOpacity>
-        </View> */}
 
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Support</Text>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            disabled={isLoading || isLoggingOut}
+          >
             <View style={styles.settingInfo}>
               <Ionicons name="help-circle-outline" size={24} color="#333" />
               <Text style={styles.settingText}>Merchant Help Center</Text>
@@ -223,7 +276,10 @@ const MerchantSettingsScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#AAAAAA" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            disabled={isLoading || isLoggingOut}
+          >
             <View style={styles.settingInfo}>
               <Ionicons name="chatbubble-ellipses-outline" size={24} color="#333" />
               <Text style={styles.settingText}>Contact Support</Text>
@@ -231,7 +287,10 @@ const MerchantSettingsScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#AAAAAA" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            disabled={isLoading || isLoggingOut}
+          >
             <View style={styles.settingInfo}>
               <Ionicons name="information-circle-outline" size={24} color="#333" />
               <Text style={styles.settingText}>About TAPYZE</Text>
@@ -246,18 +305,40 @@ const MerchantSettingsScreen = () => {
         {/* Logout and Delete Account */}
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity 
-            style={styles.logoutButton}
+            style={[
+              styles.logoutButton,
+              (isLoading || isLoggingOut) && styles.disabledButton
+            ]}
             onPress={handleLogout}
+            disabled={isLoading || isLoggingOut}
           >
-            <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
-            <Text style={styles.logoutButtonText}>Logout</Text>
+            {isLoggingOut ? (
+              <>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={[styles.logoutButtonText, { marginLeft: 8 }]}>Logging out...</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
+                <Text style={styles.logoutButtonText}>Logout</Text>
+              </>
+            )}
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={styles.deleteAccountButton}
+            style={[
+              styles.deleteAccountButton,
+              (isLoading || isLoggingOut) && styles.disabledDeleteButton
+            ]}
             onPress={handleDeleteAccount}
+            disabled={isLoading || isLoggingOut}
           >
-            <Text style={styles.deleteAccountText}>Delete Business Account</Text>
+            <Text style={[
+              styles.deleteAccountText,
+              (isLoading || isLoggingOut) && styles.disabledDeleteText
+            ]}>
+              Delete Business Account
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
