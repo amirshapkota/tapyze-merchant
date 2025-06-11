@@ -130,11 +130,10 @@ const AuthScreen = ({ navigation }) => {
   // Phone validation - Updated to match backend expectation (10 digits)
   const validatePhone = (text) => {
     if (!isLoginMode && isInputTouched.phone) {
-      const cleanPhone = text.replace(/\D/g, '');
       if (!text) {
         setPhoneError('Phone number is required');
         return false;
-      } else if (!/^\d{10}$/.test(cleanPhone)) {
+      } else if (!/^\d{10}$/.test(text)) {
         setPhoneError('Please enter a valid 10-digit phone number');
         return false;
       } else {
@@ -319,7 +318,7 @@ const AuthScreen = ({ navigation }) => {
           businessName: businessName.trim(),
           ownerName: ownerName.trim(),
           email: email.trim().toLowerCase(),
-          phone: phone.replace(/\D/g, ''), // Send only digits to backend
+          phone: phone.trim(), // Send phone as entered
           businessAddress: businessAddress.trim(),
           businessType: businessType.trim(),
           password: password,
@@ -354,29 +353,6 @@ const AuthScreen = ({ navigation }) => {
 
   const dismissKeyboard = () => {
     Keyboard.dismiss();
-  };
-
-  // Format phone number as user types
-  const formatPhoneNumber = (text) => {
-    // Strip all non-numeric characters
-    const cleaned = text.replace(/\D/g, '');
-    
-    // Limit to 10 digits
-    const limited = cleaned.substring(0, 10);
-    
-    // Format: (XXX) XXX-XXXX
-    let formatted = limited;
-    if (limited.length > 0) {
-      formatted = limited.replace(/(\d{3})(\d{0,3})(\d{0,4})/, (match, p1, p2, p3) => {
-        let result = '';
-        if (p1) result += `(${p1}`;
-        if (p2) result += `) ${p2}`;
-        if (p3) result += `-${p3}`;
-        return result;
-      });
-    }
-    
-    return formatted;
   };
 
   return (
@@ -464,10 +440,10 @@ const AuthScreen = ({ navigation }) => {
                     <Text style={styles.inputLabel}>Phone Number</Text>
                     <TextInput
                       style={[styles.input, phoneError ? styles.inputError : null]}
-                      placeholder="9800000000"
+                      placeholder="1234567890"
                       value={phone}
                       onChangeText={(text) => {
-                        setPhone(formatPhoneNumber(text));
+                        setPhone(text);
                       }}
                       onBlur={() => {
                         setIsInputTouched({...isInputTouched, phone: true});
