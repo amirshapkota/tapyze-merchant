@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+
+// Import the MerchantAuthProvider and useMerchantAuth hook
+import { MerchantAuthProvider, useMerchantAuth } from './app/context/MerchantAuthContext';
 
 import WelcomeScreen from './app/screens/WelcomeScreen';
 import AuthScreen from './app/screens/AuthScreen';
@@ -17,6 +20,7 @@ import ChangePasswordScreen from './app/screens/ChangePasswordScreen';
 import ForgotPasswordScreen from './app/screens/ForgotPasswordScreen';
 import WifiSetupScreen from './app/screens/WifiSetupScreen.js';
 import WithdrawScreen from './app/screens/WithdrawScreen.js';
+import LoadingScreen from './app/screens/LoadingScreen'; // You'll need to create this
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -180,42 +184,64 @@ const TabNavigator = () => {
   );
 };
 
-function App() {
-  // Simple auth state management for testing
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+// Auth Stack Navigator
+const AuthStackNavigator = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="Welcome" 
+        component={WelcomeScreen} 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="Auth" 
+        component={AuthScreen} 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="ForgotPassword" 
+        component={ForgotPasswordScreen} 
+        options={{ headerShown: false }} 
+      />
+    </Stack.Navigator>
+  );
+};
+
+// Main App Navigator
+const MainAppNavigator = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="MainApp"
+        component={TabNavigator}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
+  );
+};
+
+// App Content Component (uses MerchantAuthContext)
+const AppContent = () => {
+  const { isAuthenticated, isLoading } = useMerchantAuth();
+
+  // Show loading screen while checking authentication
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <NavigationContainer>
-      <Stack.Navigator>
-        {!isAuthenticated ? (
-          // Auth screens
-          <>
-            <Stack.Screen 
-              name="Welcome" 
-              component={WelcomeScreen} 
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="Auth" 
-              component={AuthScreen} 
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="ForgotPassword" 
-              component={ForgotPasswordScreen} 
-              options={{ headerShown: false }} 
-            />
-          </>
-        ) : (
-          // Main app screens
-          <Stack.Screen
-            name="MainApp"
-            component={TabNavigator}
-            options={{ headerShown: false }}
-          />
-        )}
-      </Stack.Navigator>
+      {isAuthenticated ? <MainAppNavigator /> : <AuthStackNavigator />}
     </NavigationContainer>
+  );
+};
+
+// Main App Component
+function App() {
+  return (
+    <MerchantAuthProvider>
+      <AppContent />
+    </MerchantAuthProvider>
   );
 }
 

@@ -272,7 +272,7 @@ const AuthScreen = ({ navigation }) => {
     if (isLoginMode) {
       if (isEmailValid && isPasswordValid) {
         const credentials = {
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           password: password
         };
 
@@ -318,13 +318,15 @@ const AuthScreen = ({ navigation }) => {
         const signupData = {
           businessName: businessName.trim(),
           ownerName: ownerName.trim(),
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           phone: phone.replace(/\D/g, ''), // Send only digits to backend
           businessAddress: businessAddress.trim(),
           businessType: businessType.trim(),
           password: password,
           confirmPassword: confirmPassword
         };
+
+        console.log('Signup data being sent:', signupData); // Debug log
 
         const result = await signup(signupData);
 
@@ -416,6 +418,90 @@ const AuthScreen = ({ navigation }) => {
             <View style={styles.formContainer}>
               {!isLoginMode && (
                 <>
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Business Name</Text>
+                    <TextInput
+                      style={[styles.input, businessNameError ? styles.inputError : null]}
+                      placeholder="Your business name"
+                      value={businessName}
+                      onChangeText={(text) => {
+                        setBusinessName(text);
+                      }}
+                      onBlur={() => {
+                        setIsInputTouched({...isInputTouched, businessName: true});
+                        validateBusinessName(businessName);
+                      }}
+                      autoCapitalize="words"
+                      editable={!isLoading}
+                    />
+                    {businessNameError ? (
+                      <Text style={styles.errorText}>{businessNameError}</Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Owner Name</Text>
+                    <TextInput
+                      style={[styles.input, ownerNameError ? styles.inputError : null]}
+                      placeholder="Full name of business owner"
+                      value={ownerName}
+                      onChangeText={(text) => {
+                        setOwnerName(text);
+                      }}
+                      onBlur={() => {
+                        setIsInputTouched({...isInputTouched, ownerName: true});
+                        validateOwnerName(ownerName);
+                      }}
+                      autoCapitalize="words"
+                      editable={!isLoading}
+                    />
+                    {ownerNameError ? (
+                      <Text style={styles.errorText}>{ownerNameError}</Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Phone Number</Text>
+                    <TextInput
+                      style={[styles.input, phoneError ? styles.inputError : null]}
+                      placeholder="9800000000"
+                      value={phone}
+                      onChangeText={(text) => {
+                        setPhone(formatPhoneNumber(text));
+                      }}
+                      onBlur={() => {
+                        setIsInputTouched({...isInputTouched, phone: true});
+                        validatePhone(phone);
+                      }}
+                      keyboardType="phone-pad"
+                      editable={!isLoading}
+                    />
+                    {phoneError ? (
+                      <Text style={styles.errorText}>{phoneError}</Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Business Address</Text>
+                    <TextInput
+                      style={[styles.input, businessAddressError ? styles.inputError : null]}
+                      placeholder="Full address of your business"
+                      value={businessAddress}
+                      onChangeText={(text) => {
+                        setBusinessAddress(text);
+                      }}
+                      onBlur={() => {
+                        setIsInputTouched({...isInputTouched, businessAddress: true});
+                        validateBusinessAddress(businessAddress);
+                      }}
+                      autoCapitalize="words"
+                      editable={!isLoading}
+                    />
+                    {businessAddressError ? (
+                      <Text style={styles.errorText}>{businessAddressError}</Text>
+                    ) : null}
+                  </View>
+
                   <View style={styles.inputContainer}>
                     <Text style={styles.inputLabel}>Business Type</Text>
                     <TextInput
