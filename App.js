@@ -16,7 +16,7 @@ import EditProfileScreen from './app/screens/EditProfileScreen';
 import ChangePasswordScreen from './app/screens/ChangePasswordScreen';
 import ForgotPasswordScreen from './app/screens/ForgotPasswordScreen';
 import WifiSetupScreen from './app/screens/WifiSetupScreen.js';
-import WithdrawScreen from './app/screens/WithDrawScreen.js';
+import WithdrawScreen from './app/screens/WithdrawScreen.js';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -182,7 +182,7 @@ const TabNavigator = () => {
 
 function App() {
   // Simple auth state management for testing
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   return (
     <NavigationContainer>

@@ -486,7 +486,7 @@ const ScannerScreen = () => {
                   scannerConnected ? styles.connectionActive : styles.connectionInactive
                 ]}>
                   <Ionicons 
-                    name={scannerConnected ? "radio-outline" : "radio-off-outline"} 
+                    name={scannerConnected ? "radio-outline" : "radio-outline"} 
                     size={20} 
                     color="#FFFFFF" 
                   />
