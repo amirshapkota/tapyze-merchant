@@ -12,13 +12,17 @@ import {
   Image,
   TouchableWithoutFeedback,
   Keyboard,
-  Alert
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useMerchantAuth } from '../context/MerchantAuthContext';
 import styles from '../styles/AuthScreenStyles';
 
 const AuthScreen = ({ navigation }) => {
+  const { login, signup, isLoading, error, clearError } = useMerchantAuth();
+  
   const [isLoginMode, setIsLoginMode] = useState(false);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -49,6 +53,11 @@ const AuthScreen = ({ navigation }) => {
     businessType: false,
     confirmPassword: false
   });
+
+  // Clear any existing errors when component mounts
+  useEffect(() => {
+    clearError();
+  }, []);
 
   // Validation effects - only run if fields have been touched
   useEffect(() => {
@@ -118,13 +127,14 @@ const AuthScreen = ({ navigation }) => {
     return true;
   };
 
-  // Phone validation
+  // Phone validation - Updated to match backend expectation (10 digits)
   const validatePhone = (text) => {
     if (!isLoginMode && isInputTouched.phone) {
+      const cleanPhone = text.replace(/\D/g, '');
       if (!text) {
         setPhoneError('Phone number is required');
         return false;
-      } else if (!/^\d{10}$/.test(text.replace(/\D/g, ''))) {
+      } else if (!/^\d{10}$/.test(cleanPhone)) {
         setPhoneError('Please enter a valid 10-digit phone number');
         return false;
       } else {
@@ -238,9 +248,11 @@ const AuthScreen = ({ navigation }) => {
       businessType: false,
       confirmPassword: false
     });
+    // Clear any context errors
+    clearError();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Mark all fields as touched for validation
     setIsInputTouched({
       email: true,
@@ -259,11 +271,29 @@ const AuthScreen = ({ navigation }) => {
     
     if (isLoginMode) {
       if (isEmailValid && isPasswordValid) {
-        // Handle login logic
-        console.log('Login with:', email, password);
-        // Navigate to main app after successful login
-        // navigation.navigate('Dashboard');
-        Alert.alert('Success', 'Login successful');
+        const credentials = {
+          email: email.trim(),
+          password: password
+        };
+
+        const result = await login(credentials);
+
+        if (result.success) {
+          Alert.alert(
+            'Success',
+            result.message || 'Login successful!',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Navigation will be handled automatically by AuthContext
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert('Login Failed', result.message || 'Login failed. Please try again.');
+        }
       } else {
         Alert.alert('Error', 'Please check your login information');
       }
@@ -285,19 +315,35 @@ const AuthScreen = ({ navigation }) => {
         isBusinessTypeValid &&
         isConfirmPasswordValid
       ) {
-        // Handle signup logic
-        console.log('Signup with:', {
-          businessName,
-          ownerName,
-          email,
-          phone,
-          businessAddress,
-          businessType,
-          password
-        });
-        // Navigate to main app or verification screen after successful signup
-        // navigation.navigate('Dashboard');
-        Alert.alert('Success', 'Account created successfully');
+        const signupData = {
+          businessName: businessName.trim(),
+          ownerName: ownerName.trim(),
+          email: email.trim(),
+          phone: phone.replace(/\D/g, ''), // Send only digits to backend
+          businessAddress: businessAddress.trim(),
+          businessType: businessType.trim(),
+          password: password,
+          confirmPassword: confirmPassword
+        };
+
+        const result = await signup(signupData);
+
+        if (result.success) {
+          Alert.alert(
+            'Success',
+            result.message || 'Account created successfully!',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Navigation will be handled automatically by AuthContext
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert('Signup Failed', result.message || 'Account creation failed. Please try again.');
+        }
       } else {
         Alert.alert('Error', 'Please check your signup information');
       }
@@ -360,89 +406,16 @@ const AuthScreen = ({ navigation }) => {
               </Text>
             </View>
 
+            {/* Show context error if exists */}
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
             <View style={styles.formContainer}>
               {!isLoginMode && (
                 <>
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Business Name</Text>
-                    <TextInput
-                      style={[styles.input, businessNameError ? styles.inputError : null]}
-                      placeholder="Your business name"
-                      value={businessName}
-                      onChangeText={(text) => {
-                        setBusinessName(text);
-                      }}
-                      onBlur={() => {
-                        setIsInputTouched({...isInputTouched, businessName: true});
-                        validateBusinessName(businessName);
-                      }}
-                      autoCapitalize="words"
-                    />
-                    {businessNameError ? (
-                      <Text style={styles.errorText}>{businessNameError}</Text>
-                    ) : null}
-                  </View>
-
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Owner Name</Text>
-                    <TextInput
-                      style={[styles.input, ownerNameError ? styles.inputError : null]}
-                      placeholder="Full name of business owner"
-                      value={ownerName}
-                      onChangeText={(text) => {
-                        setOwnerName(text);
-                      }}
-                      onBlur={() => {
-                        setIsInputTouched({...isInputTouched, ownerName: true});
-                        validateOwnerName(ownerName);
-                      }}
-                      autoCapitalize="words"
-                    />
-                    {ownerNameError ? (
-                      <Text style={styles.errorText}>{ownerNameError}</Text>
-                    ) : null}
-                  </View>
-
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Phone Number</Text>
-                    <TextInput
-                      style={[styles.input, phoneError ? styles.inputError : null]}
-                      placeholder="(123) 456-7890"
-                      value={phone}
-                      onChangeText={(text) => {
-                        setPhone(formatPhoneNumber(text));
-                      }}
-                      onBlur={() => {
-                        setIsInputTouched({...isInputTouched, phone: true});
-                        validatePhone(phone);
-                      }}
-                      keyboardType="phone-pad"
-                    />
-                    {phoneError ? (
-                      <Text style={styles.errorText}>{phoneError}</Text>
-                    ) : null}
-                  </View>
-
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Business Address</Text>
-                    <TextInput
-                      style={[styles.input, businessAddressError ? styles.inputError : null]}
-                      placeholder="Full address of your business"
-                      value={businessAddress}
-                      onChangeText={(text) => {
-                        setBusinessAddress(text);
-                      }}
-                      onBlur={() => {
-                        setIsInputTouched({...isInputTouched, businessAddress: true});
-                        validateBusinessAddress(businessAddress);
-                      }}
-                      autoCapitalize="words"
-                    />
-                    {businessAddressError ? (
-                      <Text style={styles.errorText}>{businessAddressError}</Text>
-                    ) : null}
-                  </View>
-
                   <View style={styles.inputContainer}>
                     <Text style={styles.inputLabel}>Business Type</Text>
                     <TextInput
@@ -457,6 +430,7 @@ const AuthScreen = ({ navigation }) => {
                         validateBusinessType(businessType);
                       }}
                       autoCapitalize="words"
+                      editable={!isLoading}
                     />
                     {businessTypeError ? (
                       <Text style={styles.errorText}>{businessTypeError}</Text>
@@ -480,6 +454,7 @@ const AuthScreen = ({ navigation }) => {
                   }}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  editable={!isLoading}
                 />
                 {emailError ? (
                   <Text style={styles.errorText}>{emailError}</Text>
@@ -501,10 +476,12 @@ const AuthScreen = ({ navigation }) => {
                       validatePassword(password);
                     }}
                     secureTextEntry={!isPasswordVisible}
+                    editable={!isLoading}
                   />
                   <TouchableOpacity 
                     style={styles.eyeIcon}
                     onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                    disabled={isLoading}
                   >
                     <Ionicons 
                       name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'} 
@@ -534,10 +511,12 @@ const AuthScreen = ({ navigation }) => {
                         validateConfirmPassword(confirmPassword);
                       }}
                       secureTextEntry={!isConfirmPasswordVisible}
+                      editable={!isLoading}
                     />
                     <TouchableOpacity 
                       style={styles.eyeIcon}
                       onPress={() => setIsConfirmPasswordVisible(!isConfirmPasswordVisible)}
+                      disabled={isLoading}
                     >
                       <Ionicons 
                         name={isConfirmPasswordVisible ? 'eye-outline' : 'eye-off-outline'} 
@@ -553,7 +532,11 @@ const AuthScreen = ({ navigation }) => {
               )}
 
               {isLoginMode && (
-                <TouchableOpacity style={styles.forgotPasswordContainer} onPress={() => navigation.navigate('ForgotPassword')}>
+                <TouchableOpacity 
+                  style={styles.forgotPasswordContainer} 
+                  onPress={() => navigation.navigate('ForgotPassword')}
+                  disabled={isLoading}
+                >
                   <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                 </TouchableOpacity>
               )}
@@ -561,14 +544,23 @@ const AuthScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={[
                   styles.submitButton,
-                  Object.values(isInputTouched).some(field => field) && !isFormValid && styles.disabledButton
+                  (isLoading || (Object.values(isInputTouched).some(field => field) && !isFormValid)) && styles.disabledButton
                 ]}
                 onPress={handleSubmit}
-                disabled={Object.values(isInputTouched).some(field => field) && !isFormValid}
+                disabled={isLoading || (Object.values(isInputTouched).some(field => field) && !isFormValid)}
               >
-                <Text style={styles.submitButtonText}>
-                  {isLoginMode ? 'Sign In' : 'Create Account'}
-                </Text>
+                {isLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={[styles.submitButtonText, { marginLeft: 10 }]}>
+                      {isLoginMode ? 'Signing In...' : 'Creating Account...'}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.submitButtonText}>
+                    {isLoginMode ? 'Sign In' : 'Create Account'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
 
@@ -576,7 +568,7 @@ const AuthScreen = ({ navigation }) => {
               <Text style={styles.toggleText}>
                 {isLoginMode ? "Don't have an account? " : "Already have an account? "}
               </Text>
-              <TouchableOpacity onPress={toggleAuthMode}>
+              <TouchableOpacity onPress={toggleAuthMode} disabled={isLoading}>
                 <Text style={styles.toggleButtonText}>
                   {isLoginMode ? 'Sign Up' : 'Sign In'}
                 </Text>
