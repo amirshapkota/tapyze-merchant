@@ -481,6 +481,64 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000000',
   },
+  centered: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+},
+
+loadingText: {
+  marginTop: 15,
+  fontSize: 16,
+  color: '#666666',
+  fontWeight: '500',
+},
+
+errorText: {
+  fontSize: 18,
+  color: '#FF3B30',
+  textAlign: 'center',
+  marginTop: 15,
+  marginBottom: 20,
+  fontWeight: '600',
+},
+
+retryButton: {
+  backgroundColor: '#ed7b0e',
+  paddingHorizontal: 30,
+  paddingVertical: 12,
+  borderRadius: 8,
+},
+
+retryButtonText: {
+  color: '#FFFFFF',
+  fontSize: 16,
+  fontWeight: '600',
+},
+
+// Empty State (when no transactions found)
+emptyStateContainer: {
+  alignItems: 'center',
+  paddingVertical: 40,
+  paddingHorizontal: 20,
+},
+
+emptyStateText: {
+  fontSize: 18,
+  color: '#666666',
+  fontWeight: '600',
+  marginTop: 15,
+  textAlign: 'center',
+},
+
+emptyStateSubtext: {
+  fontSize: 14,
+  color: '#999999',
+  marginTop: 8,
+  textAlign: 'center',
+  lineHeight: 20,
+},
 });
 
 export default styles;

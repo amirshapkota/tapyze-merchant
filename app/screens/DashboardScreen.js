@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -9,21 +9,17 @@ import {
   FlatList, 
   Modal, 
   TextInput,
-  Switch
+  Switch,
+  Alert,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
+import { useMerchantAuth } from '../context/MerchantAuthContext';
+import merchantWalletService from '../services/merchantWalletService';
 import styles from '../styles/DashboardScreenStyles';
-
-// Sample data for transactions
-const initialTransactions = [
-  { id: '1', type: 'receive', title: 'Tap Payment', customerName: 'Sarah Johnson', amount: 45.99, date: '2025-04-18', method: 'TAPYZE Card' },
-  { id: '2', type: 'receive', title: 'QR Code Payment', customerName: 'Michael Chen', amount: 120.25, date: '2025-04-18', method: 'TAPYZE App' },
-  { id: '3', type: 'receive', title: 'Tap Payment', customerName: 'David Wilson', amount: 35.50, date: '2025-04-17', method: 'TAPYZE Card' },
-  { id: '4', type: 'refund', title: 'Refund', customerName: 'Emma Thompson', amount: -18.75, date: '2025-04-17', method: 'Original Method' },
-  { id: '5', type: 'receive', title: 'Online Payment', customerName: 'James Brown', amount: 85.00, date: '2025-04-16', method: 'TAPYZE App' },
-];
 
 // Sample data for promotions
 const merchantPromotions = [
@@ -51,28 +47,95 @@ const merchantPromotions = [
 ];
 
 const DashboardScreen = () => {
-  // Get the navigation object
   const navigation = useNavigation();
+  const { user } = useMerchantAuth();
   
-  const [totalRevenue, setTotalRevenue] = useState(4287.50);
-  const [transactionCount, setTransactionCount] = useState(98);
-  const [transactions, setTransactions] = useState(initialTransactions);
+  // State management
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [error, setError] = useState(null);
+  
   const [selectedTab, setSelectedTab] = useState('all');
   const [showRevenue, setShowRevenue] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState('today');
   
-  // Add state for modals
+  // Modal states
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
-  // Calculate average transaction value
-  const averageTransaction = totalRevenue / transactionCount;
-  
-  // Filter transactions based on selected tab
-  const filteredTransactions = selectedTab === 'all' 
-    ? transactions 
-    : transactions.filter(transaction => transaction.type === selectedTab);
+  // Load dashboard data
+  const loadDashboardData = async (showLoader = true) => {
+    try {
+      if (showLoader) setIsLoading(true);
+      setError(null);
+      
+      const result = await merchantWalletService.getDashboardStats();
+      
+      if (result.success) {
+        setDashboardData(result.data);
+      } else {
+        setError(result.message);
+        Alert.alert('Error', result.message);
+      }
+    } catch (error) {
+      console.error('Error loading dashboard:', error);
+      setError('Failed to load dashboard data');
+      Alert.alert('Error', 'Failed to load dashboard data');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
+  // Load data when component mounts and when screen comes into focus
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Refresh data when screen comes into focus
+      loadDashboardData(false);
+    }, [])
+  );
+
+  // Pull to refresh
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    loadDashboardData(false);
+  };
+
+  // Get stats based on selected timeframe
+  const getCurrentStats = () => {
+    if (!dashboardData) return { transactions: 0, revenue: 0 };
+    
+    switch (selectedTimeframe) {
+      case 'today':
+        return dashboardData.stats.today;
+      case 'week':
+        return dashboardData.stats.week;
+      case 'month':
+        return dashboardData.stats.month;
+      default:
+        return dashboardData.stats.today;
+    }
+  };
+
+  // Filter transactions based on selected tab
+  const getFilteredTransactions = () => {
+    if (!dashboardData) return [];
+    
+    const transactions = dashboardData.recentTransactions;
+    
+    if (selectedTab === 'all') {
+      return transactions;
+    } else {
+      return transactions.filter(transaction => transaction.type === selectedTab);
+    }
+  };
+
+  // Navigation functions
   const navigateToProfile = () => {
     navigation.navigate('Settings');
   };
@@ -103,6 +166,11 @@ const DashboardScreen = () => {
     setShowTransactionModal(true);
   };
 
+  // Get merchant business name
+  const getBusinessName = () => {
+    return user?.businessName || 'Merchant';
+  };
+
   const renderPromotion = ({ item }) => (
     <TouchableOpacity style={[styles.promotionBanner, { backgroundColor: item.backgroundColor }]}>
       <View style={styles.promotionContent}>
@@ -117,7 +185,7 @@ const DashboardScreen = () => {
   );
 
   const renderTransaction = ({ item }) => {
-    const isPositive = item.amount > 0;
+    const isPositive = item.type === 'receive';
     
     return (
       <TouchableOpacity 
@@ -135,7 +203,7 @@ const DashboardScreen = () => {
         </View>
         <View style={styles.transactionAmountContainer}>
           <Text style={[styles.transactionAmount, isPositive ? styles.positiveAmount : styles.negativeAmount]}>
-            {isPositive ? '+' : ''}{item.amount.toFixed(2)}
+            {isPositive ? '+' : '-'}{item.amount.toFixed(2)}
           </Text>
           <Text style={styles.transactionCategory}>{item.method}</Text>
         </View>
@@ -143,9 +211,49 @@ const DashboardScreen = () => {
     );
   };
 
+  // Show loading screen
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#ed7b0e" />
+        <Text style={styles.loadingText}>Loading dashboard...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error screen
+  if (error && !dashboardData) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Ionicons name="alert-circle-outline" size={64} color="#FF3B30" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => loadDashboardData()}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  const currentStats = getCurrentStats();
+  const filteredTransactions = getFilteredTransactions();
+  const totalStats = dashboardData?.stats.total || { transactions: 0, revenue: 0, average: 0 };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollViewContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollViewContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={['#ed7b0e']}
+            tintColor="#ed7b0e"
+          />
+        }
+      >
         {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
@@ -169,7 +277,7 @@ const DashboardScreen = () => {
 
         {/* Greeting Section */}
         <View style={styles.greetingSection}>
-          <Text style={styles.greeting}>Hello, Coffee Shop</Text>
+          <Text style={styles.greeting}>Hello, {getBusinessName()}</Text>
           <Text style={styles.greetingSubtext}>Welcome to your merchant dashboard</Text>
         </View>
 
@@ -180,7 +288,7 @@ const DashboardScreen = () => {
               <Text style={styles.statsLabel}>Total Balance</Text>
               <View style={styles.statsRow}>
                 <Text style={styles.statsAmount}>
-                  {showRevenue ? totalRevenue.toFixed(2) : '••••••'}
+                  {showRevenue ? (dashboardData?.balance || 0).toFixed(2) : '••••••'}
                 </Text>
                 <Text style={styles.statsCurrency}>Rs.</Text>
                 <TouchableOpacity 
@@ -222,20 +330,20 @@ const DashboardScreen = () => {
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{transactionCount}</Text>
+              <Text style={styles.statValue}>{currentStats.transactions}</Text>
               <Text style={styles.statTitle}>Transactions</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{averageTransaction.toFixed(2)}</Text>
+              <Text style={styles.statValue}>{currentStats.revenue.toFixed(2)}</Text>
+              <Text style={styles.statTitle}>Revenue (Rs.)</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{totalStats.average.toFixed(2)}</Text>
               <Text style={styles.statTitle}>Avg. Transaction (Rs.)</Text>
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statValue}>0.5%</Text>
               <Text style={styles.statTitle}>Transaction Fee</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statValue}>15</Text>
-              <Text style={styles.statTitle}>New Customers</Text>
             </View>
           </View>
 
@@ -300,7 +408,7 @@ const DashboardScreen = () => {
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.cardName}>Main Counter Scanner</Text>
-              <Text style={styles.cardId}>Scanner ID: TPZ-7842-NFC</Text>
+              <Text style={styles.cardId}>Scanner ID: TPZ-{user?._id?.slice(-4)?.toUpperCase() || '7842'}-NFC</Text>
               <View style={styles.cardBadge}>
                 <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
                 <Text style={styles.cardBadgeText}>Ready for Payments</Text>
@@ -358,11 +466,19 @@ const DashboardScreen = () => {
 
         {/* Transactions List */}
         <View style={styles.transactionsList}>
-          {filteredTransactions.map(transaction => (
-            <View key={transaction.id}>
-              {renderTransaction({item: transaction})}
+          {filteredTransactions.length > 0 ? (
+            filteredTransactions.map(transaction => (
+              <View key={transaction.id}>
+                {renderTransaction({item: transaction})}
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="receipt-outline" size={48} color="#CCCCCC" />
+              <Text style={styles.emptyStateText}>No transactions found</Text>
+              <Text style={styles.emptyStateSubtext}>Your recent transactions will appear here</Text>
             </View>
-          ))}
+          )}
         </View>
       </ScrollView>
 
@@ -393,10 +509,10 @@ const DashboardScreen = () => {
                 </View>
                 
                 <Text style={[styles.transactionAmount, 
-                  selectedTransaction.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
+                  selectedTransaction.type === 'receive' ? styles.positiveAmount : styles.negativeAmount,
                   {fontSize: 30, textAlign: 'center', marginBottom: 20}
                 ]}>
-                  {selectedTransaction.amount > 0 ? '+' : ''}{selectedTransaction.amount.toFixed(2)} Rs.
+                  {selectedTransaction.type === 'receive' ? '+' : '-'}{selectedTransaction.amount.toFixed(2)} Rs.
                 </Text>
                 
                 <View style={styles.detailsItem}>
@@ -413,7 +529,9 @@ const DashboardScreen = () => {
                 
                 <View style={styles.detailsItem}>
                   <Text style={styles.detailsLabel}>Date & Time</Text>
-                  <Text style={styles.detailsValue}>{selectedTransaction.date}, 14:32</Text>
+                  <Text style={styles.detailsValue}>
+                    {new Date(selectedTransaction.rawTransaction?.createdAt || selectedTransaction.date).toLocaleString()}
+                  </Text>
                 </View>
                 
                 <View style={styles.detailsItem}>
@@ -422,18 +540,13 @@ const DashboardScreen = () => {
                 </View>
                 
                 <View style={styles.detailsItem}>
-                  <Text style={styles.detailsLabel}>Terminal</Text>
-                  <Text style={styles.detailsValue}>Main Counter</Text>
-                </View>
-                
-                <View style={styles.detailsItem}>
                   <Text style={styles.detailsLabel}>Transaction ID</Text>
-                  <Text style={styles.detailsValue}>TRX-{Math.floor(Math.random() * 10000).toString().padStart(4, '0')}</Text>
+                  <Text style={styles.detailsValue}>{selectedTransaction.reference}</Text>
                 </View>
                 
                 <View style={styles.detailsItem}>
                   <Text style={styles.detailsLabel}>Status</Text>
-                  <Text style={styles.detailsValue}>Completed</Text>
+                  <Text style={styles.detailsValue}>{selectedTransaction.status || 'Completed'}</Text>
                 </View>
                 
                 <View style={styles.actionButtons}>
@@ -448,7 +561,7 @@ const DashboardScreen = () => {
                     <TouchableOpacity 
                       style={[styles.actionButton, {backgroundColor: '#FF3B30'}]}
                     >
-                      <Ionicons name="wallet-outline" size={20} color="#FFF" />
+                      <Ionicons name="return-down-back-outline" size={20} color="#FFF" />
                       <Text style={styles.actionButtonText}>Refund</Text>
                     </TouchableOpacity>
                   )}
