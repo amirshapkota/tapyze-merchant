@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -9,52 +9,26 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
-  TextInput
+  TextInput,
+  Alert,
+  RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
+import { useMerchantAuth } from '../context/MerchantAuthContext';
+import merchantWalletService from '../services/merchantWalletService';
 import styles from '../styles/StatementsScreenStyles';
-
-// Sample data for statements (grouped by month)
-const initialStatements = [
-  {
-    id: 'apr2025',
-    month: 'April 2025',
-    transactions: [
-      { id: 's1', type: 'receive', title: 'Tap Payment', customerName: 'Sarah Johnson', amount: 45.99, date: '2025-04-18', method: 'TAPYZE Card', fee: 0.23 },
-      { id: 's2', type: 'receive', title: 'QR Code Payment', customerName: 'Michael Chen', amount: 120.25, date: '2025-04-15', method: 'TAPYZE App', fee: 0.60 },
-      { id: 's3', type: 'refund', title: 'Refund', customerName: 'Emma Thompson', amount: -18.75, date: '2025-04-14', method: 'Original Method', fee: 0.09 }
-    ]
-  },
-  {
-    id: 'mar2025',
-    month: 'March 2025',
-    transactions: [
-      { id: 's4', type: 'receive', title: 'Tap Payment', customerName: 'David Wilson', amount: 35.50, date: '2025-03-28', method: 'TAPYZE Card', fee: 0.18 },
-      { id: 's5', type: 'receive', title: 'Online Payment', customerName: 'James Brown', amount: 85.00, date: '2025-03-22', method: 'TAPYZE App', fee: 0.43 },
-      { id: 's6', type: 'receive', title: 'QR Code Payment', customerName: 'Jennifer Lee', amount: 78.25, date: '2025-03-15', method: 'TAPYZE App', fee: 0.39 },
-      { id: 's7', type: 'withdraw', title: 'Withdrawal', amount: -1250.00, date: '2025-03-01', method: 'Bank Transfer', fee: 0.00 }
-    ]
-  },
-  {
-    id: 'feb2025',
-    month: 'February 2025',
-    transactions: [
-      { id: 's8', type: 'receive', title: 'Tap Payment', customerName: 'Robert Garcia', amount: 55.37, date: '2025-02-25', method: 'TAPYZE Card', fee: 0.28 },
-      { id: 's9', type: 'receive', title: 'Online Payment', customerName: 'Maria Rodriguez', amount: 45.00, date: '2025-02-18', method: 'TAPYZE App', fee: 0.23 },
-      { id: 's10', type: 'refund', title: 'Refund', customerName: 'Daniel Martinez', amount: -29.50, date: '2025-02-10', method: 'Original Method', fee: 0.15 },
-      { id: 's11', type: 'receive', title: 'QR Code Payment', customerName: 'Laura Wilson', amount: 60.00, date: '2025-02-05', method: 'TAPYZE App', fee: 0.30 },
-      { id: 's12', type: 'withdraw', title: 'Withdrawal', amount: -1250.00, date: '2025-02-01', method: 'Bank Transfer', fee: 0.00 }
-    ]
-  }
-];
 
 const StatementsScreen = () => {
   const navigation = useNavigation();
-  const [statements, setStatements] = useState(initialStatements);
-  const [filteredStatements, setFilteredStatements] = useState(initialStatements);
+  const { user } = useMerchantAuth();
+  
+  // State management
+  const [statements, setStatements] = useState([]);
+  const [filteredStatements, setFilteredStatements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [dateRange, setDateRange] = useState({ 
@@ -75,24 +49,120 @@ const StatementsScreen = () => {
     fees: 0,
     netAmount: 0
   });
-  
-  useEffect(() => {
-    // Simulate loading data
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []);
 
-  // Navigate to profile/settings screen
-  const navigateToProfile = () => {
-    navigation.navigate('Settings');
+  // NEW: Transaction details modal state
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+
+  // Load transactions from backend
+  const loadTransactions = async (showLoader = true) => {
+    try {
+      if (showLoader) setIsLoading(true);
+      
+      const result = await merchantWalletService.getTransactionHistory(1, 50); // Get more for better grouping
+      
+      if (result.success) {
+        const formattedTransactions = result.transactions.map(transaction => 
+          merchantWalletService.formatTransactionForDisplay(transaction)
+        );
+        
+        // Group transactions by month like your original format
+        const groupedTransactions = groupTransactionsByMonth(formattedTransactions);
+        setStatements(groupedTransactions);
+        setFilteredStatements(groupedTransactions);
+        
+        // Calculate totals
+        calculatePeriodTotals(result.transactions);
+        
+      } else {
+        console.error('Failed to load transactions:', result.message);
+        // Keep original sample data if API fails
+      }
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+      // Keep original sample data if API fails
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   };
 
-  // Navigate back to dashboard
-  const navigateToDashboard = () => {
-    navigation.navigate('Dashboard');
+  // Group transactions by month (same as your original logic)
+  const groupTransactionsByMonth = (transactions) => {
+    const grouped = {};
+    
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.rawTransaction?.createdAt || transaction.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      
+      if (!grouped[monthKey]) {
+        grouped[monthKey] = {
+          id: monthKey,
+          month: monthLabel,
+          transactions: []
+        };
+      }
+      
+      // Add fee calculation for display
+      const transactionWithFee = {
+        ...transaction,
+        fee: transaction.type === 'receive' ? transaction.amount * 0.005 : 0 // 0.5% fee
+      };
+      
+      grouped[monthKey].transactions.push(transactionWithFee);
+    });
+    
+    return Object.values(grouped)
+      .sort((a, b) => b.id.localeCompare(a.id))
+      .map(group => ({
+        ...group,
+        transactions: group.transactions.sort((a, b) => 
+          new Date(b.rawTransaction?.createdAt || b.date) - new Date(a.rawTransaction?.createdAt || a.date)
+        )
+      }));
+  };
+
+  // Calculate period totals
+  const calculatePeriodTotals = (transactions) => {
+    let revenue = 0;
+    let refunds = 0;
+    let fees = 0;
+    
+    transactions.forEach(transaction => {
+      const amount = Math.abs(transaction.amount);
+      
+      if (transaction.type === 'CREDIT' || transaction.amount > 0) {
+        revenue += amount;
+        fees += amount * 0.005; // 0.5% fee
+      } else if (transaction.amount < 0) {
+        refunds += amount;
+      }
+    });
+    
+    const netAmount = revenue - refunds - fees;
+    
+    setPeriodTotals({
+      revenue,
+      refunds,
+      fees,
+      netAmount
+    });
+  };
+
+  useEffect(() => {
+    loadTransactions();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadTransactions(false);
+    }, [])
+  );
+
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    loadTransactions(false);
   };
   
   useEffect(() => {
@@ -109,44 +179,24 @@ const StatementsScreen = () => {
     setTotalPages(Math.ceil(totalItems / itemsPerPage));
   }, [filteredStatements, itemsPerPage]);
 
-  // Calculate totals whenever filtered statements change
-  useEffect(() => {
-    let revenue = 0;
-    let refunds = 0;
-    let fees = 0;
-    
-    filteredStatements.forEach(group => {
-      group.transactions.forEach(transaction => {
-        if (transaction.type === 'receive') {
-          revenue += transaction.amount;
-        } else if (transaction.type === 'refund') {
-          refunds += Math.abs(transaction.amount);
-        }
-        
-        if (transaction.fee) {
-          fees += transaction.fee;
-        }
-      });
-    });
-    
-    const netAmount = revenue - refunds - fees;
-    
-    setPeriodTotals({
-      revenue,
-      refunds,
-      fees,
-      netAmount
-    });
-  }, [filteredStatements]);
+  // Navigate to profile/settings screen
+  const navigateToProfile = () => {
+    navigation.navigate('Settings');
+  };
+
+  // Navigate back to dashboard
+  const navigateToDashboard = () => {
+    navigation.navigate('Dashboard');
+  };
 
   const filterStatementsByDateRange = () => {
     const startDate = new Date(dateRange.startDate);
     const endDate = new Date(dateRange.endDate);
     
     // Filter transactions based on date range
-    const filtered = initialStatements.map(group => {
+    const filtered = statements.map(group => {
       const filteredTransactions = group.transactions.filter(transaction => {
-        const transactionDate = new Date(transaction.date);
+        const transactionDate = new Date(transaction.rawTransaction?.createdAt || transaction.date);
         return transactionDate >= startDate && transactionDate <= endDate;
       });
       
@@ -192,14 +242,24 @@ const StatementsScreen = () => {
     setTimeout(() => {
       setIsDownloading(false);
       setShowExportModal(false);
+      Alert.alert('Export Successful', 'Your transaction statement has been downloaded.');
     }, 2000);
+  };
+
+  // NEW: Handle transaction selection for details modal
+  const handleTransactionSelect = (transaction) => {
+    setSelectedTransaction(transaction);
+    setShowTransactionModal(true);
   };
 
   const renderTransaction = ({ item }) => {
     const isPositive = item.type === 'receive';
     
     return (
-      <View style={styles.transactionItem}>
+      <TouchableOpacity 
+        style={styles.transactionItem}
+        onPress={() => handleTransactionSelect(item)} // NEW: Make touchable
+      >
         <View style={[styles.transactionIcon, 
           item.type === 'receive' ? styles.receiveIcon : 
           item.type === 'refund' ? styles.refundIcon : styles.withdrawIcon]}>
@@ -209,7 +269,7 @@ const StatementsScreen = () => {
         </View>
         <View style={styles.transactionInfo}>
           <Text style={styles.transactionTitle}>{item.title}</Text>
-          <Text style={styles.transactionCategory}>{item.customerName} • {formatDate(item.date)}</Text>
+          <Text style={styles.transactionCategory}>{item.customerName} • {formatDate(item.rawTransaction?.createdAt || item.date)}</Text>
         </View>
         <View style={styles.transactionAmountContainer}>
           <Text style={[styles.transactionAmount, isPositive ? styles.positiveAmount : styles.negativeAmount]}>
@@ -217,7 +277,7 @@ const StatementsScreen = () => {
           </Text>
           <Text style={styles.transactionMethod}>{item.method}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -325,7 +385,17 @@ const StatementsScreen = () => {
       </View>
 
       {/* Transaction History */}
-      <ScrollView style={styles.statementsContainer}>
+      <ScrollView 
+        style={styles.statementsContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={['#ed7b0e']}
+            tintColor="#ed7b0e"
+          />
+        }
+      >
         {filteredStatements.length > 0 ? (
           filteredStatements.map((monthGroup) => (
             <View key={monthGroup.id}>
@@ -551,6 +621,108 @@ const StatementsScreen = () => {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* NEW: Transaction Details Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showTransactionModal}
+        onRequestClose={() => setShowTransactionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Transaction Details</Text>
+              <TouchableOpacity onPress={() => setShowTransactionModal(false)}>
+                <Ionicons name="close-circle" size={28} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            {selectedTransaction && (
+              <View style={styles.modalContent}>
+                <View style={[styles.transactionIcon, 
+                  selectedTransaction.type === 'receive' ? styles.receiveIcon : 
+                  selectedTransaction.type === 'refund' ? styles.refundIcon : styles.withdrawIcon,
+                  {alignSelf: 'center', width: 60, height: 60, marginBottom: 20}
+                ]}>
+                  {selectedTransaction.type === 'receive' && <Ionicons name="arrow-down-outline" size={30} color="#FFFFFF" />}
+                  {selectedTransaction.type === 'refund' && <Ionicons name="arrow-up-outline" size={30} color="#FFFFFF" />}
+                  {selectedTransaction.type === 'withdraw' && <Ionicons name="wallet-outline" size={30} color="#FFFFFF" />}
+                </View>
+                
+                <Text style={[styles.transactionAmount, 
+                  selectedTransaction.type === 'receive' ? styles.positiveAmount : styles.negativeAmount,
+                  {fontSize: 30, textAlign: 'center', marginBottom: 20}
+                ]}>
+                  {selectedTransaction.type === 'receive' ? '+' : ''}{selectedTransaction.amount.toFixed(2)} Rs.
+                </Text>
+                
+                <View style={styles.detailsItem}>
+                  <Text style={styles.detailsLabel}>Transaction Type</Text>
+                  <Text style={styles.detailsValue}>
+                    {selectedTransaction.type === 'receive' ? 'Payment Received' : 
+                     selectedTransaction.type === 'refund' ? 'Refund Issued' : 'Withdrawal'}
+                  </Text>
+                </View>
+                
+                <View style={styles.detailsItem}>
+                  <Text style={styles.detailsLabel}>Customer</Text>
+                  <Text style={styles.detailsValue}>{selectedTransaction.customerName}</Text>
+                </View>
+                
+                <View style={styles.detailsItem}>
+                  <Text style={styles.detailsLabel}>Date & Time</Text>
+                  <Text style={styles.detailsValue}>
+                    {new Date(selectedTransaction.rawTransaction?.createdAt || selectedTransaction.date).toLocaleString()}
+                  </Text>
+                </View>
+                
+                <View style={styles.detailsItem}>
+                  <Text style={styles.detailsLabel}>Payment Method</Text>
+                  <Text style={styles.detailsValue}>{selectedTransaction.method}</Text>
+                </View>
+                
+                {selectedTransaction.reference && (
+                  <View style={styles.detailsItem}>
+                    <Text style={styles.detailsLabel}>Transaction ID</Text>
+                    <Text style={styles.detailsValue}>{selectedTransaction.reference}</Text>
+                  </View>
+                )}
+                
+                {selectedTransaction.fee && selectedTransaction.fee > 0 && (
+                  <View style={styles.detailsItem}>
+                    <Text style={styles.detailsLabel}>Transaction Fee</Text>
+                    <Text style={styles.detailsValue}>Rs. {selectedTransaction.fee.toFixed(2)}</Text>
+                  </View>
+                )}
+                
+                <View style={styles.detailsItem}>
+                  <Text style={styles.detailsLabel}>Status</Text>
+                  <Text style={styles.detailsValue}>{selectedTransaction.status || 'Completed'}</Text>
+                </View>
+                
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity 
+                    style={[styles.actionButton, styles.secondaryButton]}
+                  >
+                    <Ionicons name="receipt-outline" size={20} color="#FFF" />
+                    <Text style={styles.actionButtonText}>Send Receipt</Text>
+                  </TouchableOpacity>
+                  
+                  {selectedTransaction.type === 'receive' && (
+                    <TouchableOpacity 
+                      style={[styles.actionButton, {backgroundColor: '#FF3B30'}]}
+                    >
+                      <Ionicons name="return-down-back-outline" size={20} color="#FFF" />
+                      <Text style={styles.actionButtonText}>Refund</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
           </View>
         </View>
       </Modal>

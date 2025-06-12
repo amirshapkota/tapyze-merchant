@@ -497,6 +497,49 @@ const styles = StyleSheet.create({
     color: '#ed7b0e',
     fontWeight: '500',
   },
+  detailsItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  detailsLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  detailsValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  primaryButton: {
+    backgroundColor: '#ed7b0e',
+  },
+  secondaryButton: {
+    backgroundColor: '#000000',
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 16,
+  },
 });
 
 export default styles;
