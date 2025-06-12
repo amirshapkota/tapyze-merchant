@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Update this to match your backend URL
-const BASE_URL = 'http://192.168.1.78:5000/api'; // Update as needed
+const BASE_URL = 'http://192.168.1.78:5000/api'; 
 
 class MerchantAuthService {
   constructor() {
