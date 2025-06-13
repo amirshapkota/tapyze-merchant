@@ -17,6 +17,9 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from "@react-native-community/netinfo";
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import merchantAuthService from '../services/merchantAuthService';
+import merchantDeviceService from '../services/merchantDeviceService';
 
 // Import styles
 import styles from '../styles/ScannerScreenStyles';
@@ -24,6 +27,27 @@ import styles from '../styles/ScannerScreenStyles';
 const ScannerScreen = () => {
   // Get the navigation object
   const navigation = useNavigation();
+  
+  // Scanner assignment states
+  const [hasAssignedScanner, setHasAssignedScanner] = useState(null); // null = loading, true/false = checked
+  const [assignedScanner, setAssignedScanner] = useState(null);
+  const [isCheckingAssignment, setIsCheckingAssignment] = useState(true);
+  
+  // Scanner assignment form states
+  const [deviceId, setDeviceId] = useState('');
+  const [model, setModel] = useState('');
+  const [firmwareVersion, setFirmwareVersion] = useState('');
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [deviceIdFocused, setDeviceIdFocused] = useState(false);
+  const [firmwareFocused, setFirmwareFocused] = useState(false);
+  const [modelFocused, setModelFocused] = useState(false);
+  
+  const modelOptions = [
+    { label: 'Tapyze Pro', value: 'tapyze-pro' },
+    { label: 'Tapyze Lite', value: 'tapyze-lite' },
+    { label: 'Tapyze Mini', value: 'tapyze-mini' },
+  ];
   
   // RFID scanner states
   const [rfidReaderIP, setRfidReaderIP] = useState('192.168.4.1'); // Default setup IP
@@ -37,7 +61,7 @@ const ScannerScreen = () => {
   const [loading, setLoading] = useState(false);
   
   // Scanner details
-  const scannerDetails = {
+  const defaultScannerDetails = {
     name: 'RFID Card Reader',
     scannerId: 'TPZ-5423-RFID',
     firmwareVersion: '2.1.4',
@@ -46,22 +70,165 @@ const ScannerScreen = () => {
   
   // Animation for card detection
   const [cardAnimation] = useState(new Animated.Value(0));
-  
-  // Initialize and check network status
+
+  // Check if merchant has assigned scanner on component mount
   useEffect(() => {
-    checkNetworkStatus();
-    
-    // Set up network state change listener
-    const unsubscribe = NetInfo.addEventListener(state => {
-      if (state.isConnected && state.type === 'wifi') {
-        checkNetworkStatus();
-      }
-    });
-    
-    return () => {
-      unsubscribe();
-    };
+    checkScannerAssignment();
   }, []);
+
+  // Initialize and check network status only after scanner assignment is confirmed
+  useEffect(() => {
+    if (hasAssignedScanner === true) {
+      checkNetworkStatus();
+      
+      // Set up network state change listener
+      const unsubscribe = NetInfo.addEventListener(state => {
+        if (state.isConnected && state.type === 'wifi') {
+          checkNetworkStatus();
+        }
+      });
+      
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [hasAssignedScanner]);
+
+  // Function to check if merchant has assigned scanner
+  const checkScannerAssignment = async () => {
+    try {
+      setIsCheckingAssignment(true);
+      
+      // Check if user is authenticated using your auth service
+      const isAuth = await merchantAuthService.isAuthenticated();
+      if (!isAuth) {
+        console.log('User not authenticated');
+        Alert.alert('Error', 'Please log in again');
+        navigation.navigate('Login');
+        return;
+      }
+
+      console.log('User authenticated, checking scanners...');
+
+      // Use device service to get scanners
+      const result = await merchantDeviceService.getMerchantScanners();
+      
+      if (result.success) {
+        console.log('Scanner check result:', result);
+        
+        if (result.count > 0 && result.scanners.length > 0) {
+          // Merchant has assigned scanners
+          setHasAssignedScanner(true);
+          setAssignedScanner(result.scanners[0]); // Use the first scanner
+          
+          // Update scanner details with assigned scanner info
+          const scanner = result.scanners[0];
+          setModel(scanner.model || '');
+          setFirmwareVersion(scanner.firmwareVersion || '');
+          setDeviceId(scanner.deviceId || '');
+          
+          console.log('Scanner found:', scanner);
+        } else {
+          // No assigned scanners
+          console.log('No scanners found for merchant');
+          setHasAssignedScanner(false);
+        }
+      } else {
+        // Handle API error
+        if (result.message && (result.message.includes('401') || result.message.includes('Unauthorized'))) {
+          console.log('401 Unauthorized - Token may be invalid');
+          Alert.alert('Session Expired', 'Please log in again');
+          navigation.navigate('Login');
+        } else {
+          throw new Error(result.message || 'Failed to check scanner assignment');
+        }
+      }
+    } catch (error) {
+      console.error('Error checking scanner assignment:', error);
+      Alert.alert(
+        'Error',
+        `Failed to check scanner assignment: ${error.message}. Please try again.`,
+        [
+          {
+            text: 'Retry',
+            onPress: checkScannerAssignment
+          },
+          {
+            text: 'Skip for now',
+            onPress: () => setHasAssignedScanner(false)
+          }
+        ]
+      );
+    } finally {
+      setIsCheckingAssignment(false);
+    }
+  };
+
+  // Function to assign scanner to merchant
+  const assignScannerToMerchant = async () => {
+    if (!deviceId.trim() || !model.trim()) {
+      Alert.alert('Error', 'Please fill in Device ID and Model fields');
+      return;
+    }
+
+    try {
+      setIsAssigning(true);
+      
+      // Check if user is authenticated
+      const isAuth = await merchantAuthService.isAuthenticated();
+      if (!isAuth) {
+        Alert.alert('Error', 'Please log in again');
+        navigation.navigate('Login');
+        return;
+      }
+
+      const scannerData = {
+        deviceId: deviceId.trim(),
+        model: model.trim(),
+        firmwareVersion: firmwareVersion.trim() || '1.0.0'
+      };
+
+      console.log('Assigning scanner with data:', scannerData);
+
+      // Use device service to assign scanner
+      const result = await merchantDeviceService.assignScanner(scannerData);
+
+      console.log('Assignment response:', result);
+
+      if (result.success) {
+        Alert.alert(
+          'Success',
+          'Scanner assigned successfully!',
+          [{
+            text: 'OK',
+            onPress: () => {
+              setAssignedScanner(result.scanner);
+              setHasAssignedScanner(true);
+            }
+          }]
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          result.message || 'Failed to assign scanner. Please try again.'
+        );
+      }
+    } catch (error) {
+      console.error('Error assigning scanner:', error);
+      
+      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        Alert.alert('Session Expired', 'Please log in again');
+        navigation.navigate('Login');
+      } else {
+        Alert.alert(
+          'Error',
+          error.message || 'Network error. Please check your connection and try again.'
+        );
+      }
+    } finally {
+      setIsAssigning(false);
+    }
+  };
   
   // Function to check network status
   const checkNetworkStatus = async () => {
@@ -379,7 +546,11 @@ const ScannerScreen = () => {
   // Handle manual refresh
   const onRefresh = async () => {
     setRefreshing(true);
-    await checkNetworkStatus();
+    if (hasAssignedScanner) {
+      await checkNetworkStatus();
+    } else {
+      await checkScannerAssignment();
+    }
     setRefreshing(false);
   };
   
@@ -426,6 +597,267 @@ const ScannerScreen = () => {
       outputRange: ['#FFFFFF', '#FFF8F0']
     })
   };
+
+  // Show loading screen while checking assignment
+  if (isCheckingAssignment) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color="#ed7b0e" />
+          <Text style={{ marginTop: 20, fontSize: 16, color: '#666' }}>
+            Checking scanner assignment...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show scanner assignment screen if no scanner is assigned
+  if (hasAssignedScanner === false) {
+    return (
+      <SafeAreaView style={styles.container}>
+        {/* Header Section */}
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Image 
+              source={require('../assets/logo.png')} 
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+            <View>
+              <Text style={styles.brandName}>TAPYZE</Text>
+              <Text style={styles.merchantLabel}>MERCHANT</Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={navigateToSettings}
+          >
+            <Ionicons name="person-circle-outline" size={40} color="#ed7b0e" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView 
+          contentContainerStyle={styles.scrollViewContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#ed7b0e']}
+            />
+          }
+        >
+          {/* Scanner Assignment Section */}
+          <View style={styles.detailsSection}>
+            <View style={[styles.sectionHeader, { flexDirection: 'row', alignItems: 'center' }]}>
+              <MaterialCommunityIcons name="credit-card-scan-outline" size={24} color="#ed7b0e" style={{ marginRight: 8 }} />
+              <Text style={styles.sectionTitle}>Assign RFID Scanner</Text>
+            </View>
+            
+            <View style={styles.assignmentFormSection}>
+              <Text style={[styles.detailValue, { marginBottom: 25, textAlign: 'center', color: '#666', fontSize: 15, lineHeight: 22 }]}>
+                You need to assign an RFID scanner to your account before you can start accepting payments.
+              </Text>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>
+                  Device ID <Text style={styles.requiredIndicator}>*</Text>
+                </Text>
+                <View style={[
+                  styles.inputContainer,
+                  deviceIdFocused && styles.inputContainerFocused
+                ]}>
+                  <MaterialCommunityIcons 
+                    name="credit-card-scan-outline" 
+                    size={20} 
+                    color={deviceIdFocused ? "#ed7b0e" : "#666"} 
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.textInput}
+                    value={deviceId}
+                    onChangeText={setDeviceId}
+                    onFocus={() => setDeviceIdFocused(true)}
+                    onBlur={() => setDeviceIdFocused(false)}
+                    placeholder="Enter scanner device ID (e.g., TPZ-5423-RFID)"
+                    placeholderTextColor="#888"
+                    autoCapitalize="characters"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>
+                  Model <Text style={styles.requiredIndicator}>*</Text>
+                </Text>
+                <View style={[
+                  styles.dropdownContainer,
+                  (showModelDropdown || modelFocused) && styles.dropdownContainerFocused,
+                  showModelDropdown && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }
+                ]}>
+                  <TouchableOpacity
+                    style={styles.dropdownButton}
+                    onPress={() => {
+                      setShowModelDropdown(!showModelDropdown);
+                      setModelFocused(!showModelDropdown);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialCommunityIcons 
+                      name="cellphone-nfc" 
+                      size={20} 
+                      color={(showModelDropdown || modelFocused) ? "#ed7b0e" : "#666"} 
+                      style={styles.inputIcon}
+                    />
+                    <Text style={model ? styles.dropdownButtonText : styles.dropdownPlaceholder}>
+                      {model ? modelOptions.find(option => option.value === model)?.label : 'Select scanner model'}
+                    </Text>
+                    <Ionicons 
+                      name={showModelDropdown ? "chevron-up" : "chevron-down"} 
+                      size={20} 
+                      color={(showModelDropdown || modelFocused) ? "#ed7b0e" : "#666"}
+                      style={styles.dropdownIcon}
+                    />
+                  </TouchableOpacity>
+                </View>
+                
+                {showModelDropdown && (
+                  <View style={[styles.dropdownList, { 
+                    borderWidth: 1,
+                    borderTopWidth: 0,
+                    borderColor: '#ed7b0e',
+                  }]}>
+                    {modelOptions.map((option, index) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.dropdownItem,
+                          model === option.value && styles.dropdownItemSelected,
+                          index === modelOptions.length - 1 && { borderBottomWidth: 0 }
+                        ]}
+                        onPress={() => {
+                          setModel(option.value);
+                          setShowModelDropdown(false);
+                          setModelFocused(false);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialCommunityIcons 
+                          name="cellphone-nfc" 
+                          size={16} 
+                          color={model === option.value ? "#ed7b0e" : "#666"} 
+                          style={{ marginRight: 10 }}
+                        />
+                        <Text style={[
+                          styles.dropdownItemText,
+                          model === option.value && styles.dropdownItemSelectedText
+                        ]}>
+                          {option.label}
+                        </Text>
+                        {model === option.value && (
+                          <Ionicons 
+                            name="checkmark" 
+                            size={18} 
+                            color="#ed7b0e" 
+                            style={{ marginLeft: 'auto' }}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Firmware Version</Text>
+                <View style={[
+                  styles.inputContainer,
+                  firmwareFocused && styles.inputContainerFocused
+                ]}>
+                  <MaterialCommunityIcons 
+                    name="update" 
+                    size={20} 
+                    color={firmwareFocused ? "#ed7b0e" : "#666"} 
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.textInput}
+                    value={firmwareVersion}
+                    onChangeText={setFirmwareVersion}
+                    onFocus={() => setFirmwareFocused(true)}
+                    onBlur={() => setFirmwareFocused(false)}
+                    placeholder="Enter firmware version (optional)"
+                    placeholderTextColor="#888"
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.assignmentButton,
+                  isAssigning && styles.assignmentButtonDisabled
+                ]}
+                onPress={assignScannerToMerchant}
+                disabled={isAssigning}
+                activeOpacity={0.8}
+              >
+                {isAssigning ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.assignmentButtonText}>
+                    Assign Scanner
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Help Section */}
+          <View style={styles.helpSection}>
+            <View style={styles.helpHeader}>
+              <Ionicons name="help-circle-outline" size={24} color="#ed7b0e" />
+              <Text style={styles.helpTitle}>
+                How to find your scanner details?
+              </Text>
+            </View>
+            
+            <Text style={styles.helpText}>
+              Your RFID scanner's Device ID and Model can usually be found on a label on the device itself or in the device manual. If you're unsure, contact your hardware provider for assistance.
+            </Text>
+            
+            <TouchableOpacity style={{
+              backgroundColor: '#ed7b0e',
+              borderRadius: 8,
+              paddingVertical: 12,
+              paddingHorizontal: 20,
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 3,
+              elevation: 2,
+            }}>
+              <Text style={{
+                fontSize: 14,
+                color: '#FFFFFF',
+                fontWeight: '600',
+              }}>
+                Contact Support
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Show main scanner screen if scanner is assigned
+  const scannerDetails = assignedScanner ? {
+    name: assignedScanner.model || 'RFID Card Reader',
+    scannerId: assignedScanner.deviceId,
+    firmwareVersion: assignedScanner.firmwareVersion,
+    location: 'Main Counter'
+  } : defaultScannerDetails;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -545,6 +977,27 @@ const ScannerScreen = () => {
               </View>
             </View>
             
+            {assignedScanner && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Assignment Status</Text>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#F0F8F0',
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  borderRadius: 6,
+                  borderLeftWidth: 3,
+                  borderLeftColor: '#28a745',
+                }}>
+                  <MaterialCommunityIcons name="check-circle" size={16} color="#28a745" />
+                  <Text style={[styles.detailValue, { color: '#28a745', marginLeft: 6, fontSize: 14 }]}>
+                    Assigned to your account
+                  </Text>
+                </View>
+              </View>
+            )}
+            
             {networkInfo && (
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Network</Text>
@@ -629,8 +1082,19 @@ const ScannerScreen = () => {
               />
               
               {scanHistory.length > 5 && (
-                <TouchableOpacity style={styles.viewAllButton}>
-                  <Text style={styles.viewAllText}>View All Scans</Text>
+                <TouchableOpacity style={{
+                  paddingVertical: 12,
+                  paddingHorizontal: 15,
+                  alignItems: 'center',
+                  borderTopWidth: 1,
+                  borderTopColor: '#F0F0F0',
+                  marginTop: 5,
+                }}>
+                  <Text style={{
+                    fontSize: 14,
+                    color: '#ed7b0e',
+                    fontWeight: '600',
+                  }}>View All Scans</Text>
                 </TouchableOpacity>
               )}
             </View>

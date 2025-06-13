@@ -355,6 +355,191 @@ manualIpButtonContainer: {
     color: '#333',
     fontWeight: '500',
   },
+
+  textInput: {
+    flex: 1,
+    color: '#333',
+    fontSize: 16,
+    height: 50,
+  },
+
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 50,
+    backgroundColor: '#F9F9F9',
+  },
+
+  inputContainerFocused: {
+    borderColor: '#ed7b0e',
+    backgroundColor: '#FFFFFF',
+  },
+
+  inputGroup: {
+    marginBottom: 20,
+  },
+
+  inputLabel: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+
+  inputIcon: {
+    marginRight: 10,
+  },
+
+  // Update these dropdown styles in your stylesheet
+
+dropdownContainer: {
+  borderWidth: 1,
+  borderColor: '#E0E0E0',
+  borderRadius: 12,
+  backgroundColor: '#F9F9F9',
+  minHeight: 50,
+  position: 'relative',
+  zIndex: 1000,
+},
+
+dropdownContainerFocused: {
+  borderColor: '#ed7b0e',
+  backgroundColor: '#FFFFFF',
+},
+
+dropdownButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 12,
+  height: 50,
+},
+
+dropdownButtonText: {
+  fontSize: 16,
+  color: '#333',
+  flex: 1,
+},
+
+dropdownPlaceholder: {
+  fontSize: 16,
+  color: '#888',
+  flex: 1,
+},
+
+dropdownIcon: {
+  marginLeft: 10,
+},
+
+dropdownList: {
+  backgroundColor: '#FFFFFF',
+  borderBottomLeftRadius: 12,
+  borderBottomRightRadius: 12,
+  position: 'absolute',
+  top: 80,
+  left: -1,
+  right: -1,
+  zIndex: 1001,
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.1,
+  shadowRadius: 3,
+  elevation: 5,
+},
+
+dropdownItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 15,
+  paddingHorizontal: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F0F0F0',
+},
+
+dropdownItemText: {
+  fontSize: 16,
+  color: '#333',
+  flex: 1,
+},
+
+dropdownItemSelected: {
+  backgroundColor: '#FFF5F0',
+},
+
+dropdownItemSelectedText: {
+  color: '#ed7b0e',
+  fontWeight: '600',
+},
+
+  assignmentButton: {
+    backgroundColor: '#ed7b0e',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ed7b0e',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  assignmentButtonDisabled: {
+    backgroundColor: '#f5a55e',
+  },
+
+  assignmentButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  assignmentFormSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginHorizontal: 15,
+    marginVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+
+  requiredIndicator: {
+    color: '#ed7b0e',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  viewAllButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    marginTop: 5,
+  },
+
+  viewAllText: {
+    fontSize: 14,
+    color: '#ed7b0e',
+    fontWeight: '600',
+  },
 });
 
 export default styles;
