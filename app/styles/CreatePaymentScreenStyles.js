@@ -510,9 +510,16 @@ cardTypeText: {
   color: '#555555',
 },
 
-// Keypad modifications
 disabledKey: {
   opacity: 0.3,
+},
+
+attemptsText: {
+  fontSize: 12,
+  color: '#FF9500',
+  textAlign: 'center',
+  marginTop: 5,
+  fontWeight: '500',
 },
   
 });

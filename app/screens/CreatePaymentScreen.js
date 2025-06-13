@@ -12,7 +12,9 @@ import {
   Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import merchantAuthService from '../services/merchantAuthService';
 
 import styles from '../styles/CreatePaymentScreenStyles';
 
@@ -23,6 +25,7 @@ const CreatePaymentScreen = () => {
   const PIN_LENGTH = 4; // Standard PIN length
   
   const navigation = useNavigation();
+  const route = useRoute();
   const nfcAnimation = useRef(new Animated.Value(1)).current;
   const scaleAnimation = useRef(new Animated.Value(0.95)).current;
   
@@ -31,9 +34,36 @@ const CreatePaymentScreen = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [processingTimeout, setProcessingTimeout] = useState(null);
+  const [rfidPollingInterval, setRfidPollingInterval] = useState(null);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
-  const [cardType, setCardType] = useState('TAPYZE Card'); // Default card type, could be updated from NFC read
+  const [cardType, setCardType] = useState('TAPYZE Card');
+  const [scannedCard, setScannedCard] = useState(null);
+  const [customerInfo, setCustomerInfo] = useState(null);
+  const [pinAttempts, setPinAttempts] = useState(0);
+  const [maxAttempts, setMaxAttempts] = useState(3);
+  const [currentScannerIP, setCurrentScannerIP] = useState('192.168.4.1');
+
+  // Load scanner IP from AsyncStorage
+  useEffect(() => {
+    const loadScannerIP = async () => {
+      try {
+        const storedIP = await AsyncStorage.getItem('scannerIP');
+        if (storedIP) {
+          console.log('Payment screen loaded scanner IP from storage:', storedIP);
+          setCurrentScannerIP(storedIP);
+        } else {
+          console.log('No scanner IP found in storage, using default');
+          setCurrentScannerIP('192.168.4.1');
+        }
+      } catch (error) {
+        console.error('Failed to load scanner IP from AsyncStorage:', error);
+        setCurrentScannerIP('192.168.4.1');
+      }
+    };
+    
+    loadScannerIP();
+  }, []);
   
   useEffect(() => {
     // Animate card scaling on mount
@@ -48,34 +78,34 @@ const CreatePaymentScreen = () => {
       if (processingTimeout) {
         clearTimeout(processingTimeout);
       }
+      if (rfidPollingInterval) {
+        clearInterval(rfidPollingInterval);
+      }
     };
   }, []);
   
   const handleGoBack = () => {
+    // Stop RFID polling when leaving screen
+    if (rfidPollingInterval) {
+      clearInterval(rfidPollingInterval);
+      setRfidPollingInterval(null);
+    }
+
     // Prevent immediate navigation if a transaction is in progress
     if (paymentStatus === 'processing') {
-      // Show a confirmation dialog when trying to go back during processing
       Alert.alert(
         "Cancel Transaction?",
         "A transaction is in progress. Are you sure you want to cancel?",
         [
-          { 
-            text: "Stay", 
-            style: "cancel" 
-          },
+          { text: "Stay", style: "cancel" },
           { 
             text: "Cancel Transaction", 
             onPress: () => {
-              // Stop any ongoing animations and clear timeouts
               if (processingTimeout) {
                 clearTimeout(processingTimeout);
                 setProcessingTimeout(null);
               }
-              
-              // Reset the payment state
               resetPayment();
-              
-              // Navigate back without animation
               navigation.goBack();
             } 
           }
@@ -83,19 +113,14 @@ const CreatePaymentScreen = () => {
       );
       return;
     }
+    
     if (paymentStatus === 'success') {
       Alert.alert(
         "Leave Payment Screen?",
         "Do you want to return to the previous screen?",
         [
-          { 
-            text: "Stay", 
-            style: "cancel" 
-          },
-          { 
-            text: "Go Back", 
-            onPress: () => navigation.goBack() 
-          }
+          { text: "Stay", style: "cancel" },
+          { text: "Go Back", onPress: () => navigation.goBack() }
         ]
       );
       return;
@@ -106,10 +131,7 @@ const CreatePaymentScreen = () => {
         "Cancel Payment?",
         "Are you sure you want to cancel this payment?",
         [
-          { 
-            text: "Continue Payment", 
-            style: "cancel" 
-          },
+          { text: "Continue Payment", style: "cancel" },
           { 
             text: "Cancel", 
             onPress: () => {
@@ -125,7 +147,7 @@ const CreatePaymentScreen = () => {
     navigation.goBack();
   };
   
-  // amount handlers
+  // Amount handlers
   const handleNumberPress = (number) => {
     // If in PIN entry mode, handle PIN input
     if (paymentStatus === 'enterPin') {
@@ -137,28 +159,23 @@ const CreatePaymentScreen = () => {
     }
     
     // Else handle amount input
-    // If amount already has two decimal places, don't add more digits
     if (amount.includes('.') && amount.split('.')[1].length >= 2) {
       return;
     }
     
-    // Maximum amount validation (for demo purpose)
     if (!amount.includes('.') && amount.length >= 6) {
       return; // Limit to 999,999
     }
     
-    // If we're adding a number and the current value is just 0, replace it
     if (amount === '0' && number !== '.') {
       setAmount(number);
       return;
     }
     
-    // If we're trying to add a decimal point but there's already one, do nothing
     if (number === '.' && amount.includes('.')) {
       return;
     }
     
-    // If we're adding a decimal point to an empty field, add "0." instead
     if (number === '.' && amount === '') {
       setAmount('0.');
       return;
@@ -197,7 +214,6 @@ const CreatePaymentScreen = () => {
   
   const formatAmount = (value) => {
     if (!value || value === '') return '0.00';
-    
     const numValue = parseFloat(value);
     return numValue.toFixed(2);
   };
@@ -209,6 +225,14 @@ const CreatePaymentScreen = () => {
       return;
     }
     
+    // Scanner IP validation
+    if (!currentScannerIP) {
+      setErrorMessage('Scanner IP not available. Please go back and reconnect scanner.');
+      return;
+    }
+    
+    console.log('Payment setup - Amount:', amount, 'Scanner IP:', currentScannerIP);
+    
     // Clear any error messages
     setErrorMessage('');
     
@@ -217,6 +241,9 @@ const CreatePaymentScreen = () => {
     
     // Start the NFC reader animation
     startNfcAnimation();
+    
+    // Start RFID polling
+    startRFIDPolling();
   };
   
   const startNfcAnimation = () => {
@@ -236,68 +263,230 @@ const CreatePaymentScreen = () => {
       ])
     ).start();
   };
+
+  // Start RFID polling for card detection
+  const startRFIDPolling = () => {
+    console.log('Starting RFID polling for payment at IP:', currentScannerIP);
+    
+    // First test the scanner connection
+    fetch(`http://${currentScannerIP}/status`, { timeout: 3000 })
+      .then(response => response.json())
+      .then(data => {
+        console.log('Scanner status check successful:', data);
+      })
+      .catch(error => {
+        console.error('Scanner status check failed:', error);
+        setErrorMessage('Cannot connect to scanner. Please check scanner connection.');
+        setPaymentStatus('failed');
+        return;
+      });
+    
+    let lastProcessedUID = "";
+    let lastReceivedTimestamp = 0;
+    
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`http://${currentScannerIP}/read-rfid`, {
+          method: 'GET',
+          timeout: 3000
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Only process if:
+          // 1. We have a valid UID
+          // 2. The UID is different from the last one OR the timestamp has changed (indicating a new detection)
+          if (data.uid && data.uid.length > 0) {
+            const isNewUID = data.uid !== lastProcessedUID;
+            const isNewTimestamp = data.timestamp !== lastReceivedTimestamp && data.timestamp > 0;
+            
+            if (isNewUID || isNewTimestamp) {
+              console.log('🎉 RFID card detected for payment:', data.uid, 'Timestamp:', data.timestamp);
+              
+              // Update our tracking variables
+              lastProcessedUID = data.uid;
+              lastReceivedTimestamp = data.timestamp;
+              
+              // Stop polling once card is detected
+              clearInterval(interval);
+              setRfidPollingInterval(null);
+              
+              // Handle card detection
+              await handleCardDetected(data.uid);
+            } else {
+              // Same UID and timestamp - this is the old detection
+              console.log('Ignoring old card data:', data.uid, 'Timestamp:', data.timestamp);
+            }
+          }
+        } else {
+          console.log('RFID polling response not ok:', response.status);
+        }
+      } catch (error) {
+        console.error('RFID polling error:', error.message);
+        
+        // If we can't reach the scanner, show error
+        if (error.message.includes('Network request failed') || error.message.includes('timeout')) {
+          console.log('Scanner connection lost, stopping polling');
+          clearInterval(interval);
+          setRfidPollingInterval(null);
+          setErrorMessage('Scanner connection lost. Please check the scanner and try again.');
+          setPaymentStatus('failed');
+        }
+      }
+    }, 1000); // Poll every second
+    
+    setRfidPollingInterval(interval);
+    
+    // Add timeout to stop polling after 60 seconds
+    setTimeout(() => {
+      if (interval) {
+        console.log('RFID polling timeout - stopping');
+        clearInterval(interval);
+        setRfidPollingInterval(null);
+        if (paymentStatus === 'ready') {
+          setErrorMessage('No card detected within 60 seconds. Please try again.');
+          setPaymentStatus('failed');
+        }
+      }
+    }, 60000);
+  };
   
-  // Simulate card detection - in production, this would come from NFC hardware
-  const handleCardDetected = () => {
-    // Transition to PIN entry state
-    setPaymentStatus('enterPin');
-    
-    // Stop NFC animation
-    nfcAnimation.stopAnimation();
-    
-    // Clear PIN if any
-    setPin('');
-    setPinError('');
+  // Handle real card detection from RFID
+  const handleCardDetected = async (cardUid) => {
+    try {
+      console.log('Processing detected card:', cardUid);
+      
+      // Stop NFC animation
+      nfcAnimation.stopAnimation();
+      
+      // Verify card exists and get basic info (without PIN verification)
+      const response = await merchantAuthService.apiCall(`/payments/rfid/verify/${cardUid}`, {
+        method: 'GET'
+      });
+      
+      if (response.status === 'success') {
+        // Store card info
+        setScannedCard({
+          uid: cardUid,
+          status: response.data.cardStatus,
+          expiryDate: response.data.expiryDate,
+          lastUsed: response.data.lastUsed
+        });
+        
+        // Transition to PIN entry state
+        setPaymentStatus('enterPin');
+        setPin('');
+        setPinError('');
+        setPinAttempts(0);
+        
+      } else {
+        // Card verification failed
+        setErrorMessage(response.message || 'Invalid card detected');
+        setPaymentStatus('failed');
+      }
+    } catch (error) {
+      console.error('Card verification error:', error);
+      setErrorMessage('Failed to verify card. Please try again.');
+      setPaymentStatus('failed');
+    }
   };
   
   // Handle PIN submission
-  const handlePinSubmit = () => {
+  const handlePinSubmit = async () => {
     if (pin.length !== PIN_LENGTH) {
       setPinError(`Please enter ${PIN_LENGTH} digit PIN`);
       return;
     }
     
-    // In production: Verify PIN with payment processor
-    // For demo: Just proceed with payment processing
-    processPayment();
+    if (!scannedCard) {
+      setPinError('No card detected. Please try again.');
+      return;
+    }
+    
+    // Clear any previous errors
+    setPinError('');
+    
+    // Process payment with PIN verification
+    await processPayment();
   };
   
-  // Process payment - in production, this would connect to payment processor
-  const processPayment = () => {
-    // Transition to processing state
-    setPaymentStatus('processing');
-    
-    // In production: Send payment request to processor with PIN
-    // For demo: Simulate processing with timeout
-    const timeout = setTimeout(() => {
-      // Generate transaction ID
-      const txId = generateTransactionId();
-      setTransactionId(txId);
+  // Process payment with backend integration
+  const processPayment = async () => {
+    try {
+      // Transition to processing state
+      setPaymentStatus('processing');
       
-      // Simulate 70% success rate
-      const isSuccess = Math.random() > 0.3;
+      console.log('Processing payment...', {
+        cardUid: scannedCard.uid,
+        amount: parseFloat(amount),
+        pin: pin
+      });
       
-      // Update payment status
-      setPaymentStatus(isSuccess ? 'success' : 'failed');
+      // Call backend API to process RFID payment
+      const response = await merchantAuthService.apiCall('/payments/rfid/process', {
+        method: 'POST',
+        body: JSON.stringify({
+          cardUid: scannedCard.uid,
+          pin: pin,
+          amount: parseFloat(amount),
+          description: `Payment at merchant - ${new Date().toLocaleString()}`
+        })
+      });
       
-    }, 3000); // Simulated processing time
-    
-    setProcessingTimeout(timeout);
-  };
-  
-  const generateTransactionId = () => {
-    // Format: TXN-YYYYMMDD-XXXXX
-    const date = new Date();
-    const datePart = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-    const randomPart = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
-    
-    return `TXN-${datePart}-${randomPart}`;
+      if (response.status === 'success') {
+        // Payment successful
+        console.log('Payment successful:', response.data);
+        
+        setTransactionId(response.data.transactionReference);
+        setCustomerInfo({
+          newBalance: response.data.customerBalance,
+          merchantBalance: response.data.merchantBalance
+        });
+        
+        setPaymentStatus('success');
+        
+      } else {
+        // Payment failed
+        console.log('Payment failed:', response);
+        
+        // Handle specific error cases
+        if (response.data && response.data.remainingAttempts !== undefined) {
+          setPinAttempts(3 - response.data.remainingAttempts);
+          setMaxAttempts(3);
+          
+          if (response.data.isLocked) {
+            setErrorMessage('Card is locked due to too many failed PIN attempts');
+          } else {
+            setPinError(`Invalid PIN. ${response.data.remainingAttempts} attempts remaining.`);
+            setPaymentStatus('enterPin'); // Stay on PIN entry for retry
+            setPin(''); // Clear PIN for retry
+            return;
+          }
+        } else {
+          setErrorMessage(response.message || 'Payment processing failed');
+        }
+        
+        setPaymentStatus('failed');
+      }
+      
+    } catch (error) {
+      console.error('Payment processing error:', error);
+      setErrorMessage('Network error. Please check your connection and try again.');
+      setPaymentStatus('failed');
+    }
   };
   
   const resetPayment = () => {
     // Stop animations
     nfcAnimation.stopAnimation();
     nfcAnimation.setValue(1);
+    
+    // Stop RFID polling
+    if (rfidPollingInterval) {
+      clearInterval(rfidPollingInterval);
+      setRfidPollingInterval(null);
+    }
     
     // Clear timeout if exists
     if (processingTimeout) {
@@ -312,6 +501,9 @@ const CreatePaymentScreen = () => {
     setTransactionId('');
     setPin('');
     setPinError('');
+    setScannedCard(null);
+    setCustomerInfo(null);
+    setPinAttempts(0);
   };
     
   const renderAmountDisplay = () => {
@@ -350,6 +542,12 @@ const CreatePaymentScreen = () => {
           ))}
         </View>
         
+        {pinAttempts > 0 && (
+          <Text style={styles.attemptsText}>
+            {maxAttempts - pinAttempts} attempts remaining
+          </Text>
+        )}
+        
         {pinError ? (
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle" size={16} color="#FF3B30" />
@@ -361,7 +559,6 @@ const CreatePaymentScreen = () => {
   };
   
   const renderNumberPad = () => {
-    // Keypad layout with positions
     const keys = [
       { value: '1' }, { value: '2' }, { value: '3' },
       { value: '4' }, { value: '5' }, { value: '6' },
@@ -461,7 +658,7 @@ const CreatePaymentScreen = () => {
           >
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>Ready For Payment</Text>
-              <Text style={styles.cardSubtitle}>Present card or device to complete transaction</Text>
+              <Text style={styles.cardSubtitle}>Present RFID card to complete transaction</Text>
             </View>
             
             <View style={styles.amountSummary}>
@@ -488,27 +685,14 @@ const CreatePaymentScreen = () => {
               </Animated.View>
               
               <Text style={styles.nfcInstructions}>
-                Hold card or device near the NFC reader
+                Tap your RFID card on the scanner
               </Text>
               
               <View style={styles.statusBadge}>
                 <View style={styles.statusIndicator}></View>
-                <Text style={styles.statusText}>Ready</Text>
+                <Text style={styles.statusText}>Waiting for card...</Text>
               </View>
             </View>
-            
-            {/* DEVELOPMENT ONLY - Remove in production */}
-            {__DEV__ && (
-              <TouchableOpacity
-                style={styles.devButton}
-                activeOpacity={0.7}
-                onPress={handleCardDetected}
-              >
-                <Text style={styles.devButtonText}>
-                  [DEV] Simulate Card Detection
-                </Text>
-              </TouchableOpacity>
-            )}
             
             <TouchableOpacity
               style={styles.cancelButton}
@@ -537,7 +721,9 @@ const CreatePaymentScreen = () => {
                 </View>
               </View>
               <Text style={styles.cardDetectedText}>Card Detected</Text>
-              <Text style={styles.cardTypeText}>{cardType}</Text>
+              <Text style={styles.cardTypeText}>
+                UID: {scannedCard?.uid ? `${scannedCard.uid.substring(0, 8)}...` : 'Unknown'}
+              </Text>
             </View>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>Enter PIN</Text>
@@ -603,7 +789,7 @@ const CreatePaymentScreen = () => {
               
               <View style={styles.processingStatusContainer}>
                 <Text style={styles.processingText}>
-                  Transaction in progress
+                  Verifying card and processing payment
                 </Text>
                 <Text style={styles.processingAmount}>
                   {CURRENCY} {formatAmount(amount)}
@@ -660,9 +846,18 @@ const CreatePaymentScreen = () => {
               </View>
               
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Payment Method</Text>
-                <Text style={styles.detailValue}>{cardType}</Text>
+                <Text style={styles.detailLabel}>Card UID</Text>
+                <Text style={styles.detailValue}>
+                  {scannedCard?.uid ? `${scannedCard.uid.substring(0, 12)}...` : 'N/A'}
+                </Text>
               </View>
+              
+              {customerInfo && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Customer Balance</Text>
+                  <Text style={styles.detailValue}>{CURRENCY} {customerInfo.newBalance?.toFixed(2)}</Text>
+                </View>
+              )}
               
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Status</Text>
@@ -723,12 +918,14 @@ const CreatePaymentScreen = () => {
                 </Text>
               </View>
               
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Transaction ID</Text>
-                <Text style={styles.detailValue}>
-                  {transactionId || 'N/A'}
-                </Text>
-              </View>
+              {scannedCard && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Card UID</Text>
+                  <Text style={styles.detailValue}>
+                    {scannedCard.uid ? `${scannedCard.uid.substring(0, 12)}...` : 'N/A'}
+                  </Text>
+                </View>
+              )}
               
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Status</Text>
@@ -739,7 +936,7 @@ const CreatePaymentScreen = () => {
               
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Error</Text>
-                <Text style={styles.errorValue}>Card Read Error</Text>
+                <Text style={styles.errorValue}>{errorMessage || 'Payment processing failed'}</Text>
               </View>
             </View>
             
@@ -747,10 +944,10 @@ const CreatePaymentScreen = () => {
               <TouchableOpacity
                 style={styles.retryButton}
                 activeOpacity={0.8}
-                onPress={() => setPaymentStatus('ready')}
+                onPress={resetPayment}
               >
                 <Ionicons name="refresh-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.buttonText}>Retry Payment</Text>
+                <Text style={styles.buttonText}>Try Again</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -788,7 +985,7 @@ const CreatePaymentScreen = () => {
         <Text style={styles.screenTitle}>Accept Payment</Text>
         <Text style={styles.screenSubtitle}>
           {paymentStatus === 'initial' ? 'Enter amount to create a new transaction' :
-           paymentStatus === 'ready' ? 'Ready to accept contactless payment' :
+           paymentStatus === 'ready' ? 'Ready to accept RFID card payment' :
            paymentStatus === 'enterPin' ? 'Card detected - Enter PIN to complete payment' :
            paymentStatus === 'processing' ? 'Processing your transaction' :
            paymentStatus === 'success' ? 'Payment completed successfully' :

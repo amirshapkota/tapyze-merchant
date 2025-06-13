@@ -7,11 +7,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  FlatList,
   RefreshControl,
-  Animated,
   Image,
-  Vibration,
   SafeAreaView,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -53,8 +50,6 @@ const ScannerScreen = () => {
   const [rfidReaderIP, setRfidReaderIP] = useState('192.168.4.1'); // Default setup IP
   const [scannerConnected, setScannerConnected] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [lastScannedCard, setLastScannedCard] = useState(null);
-  const [scanHistory, setScanHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [networkInfo, setNetworkInfo] = useState(null);
   const [lastActive, setLastActive] = useState('Never');
@@ -67,9 +62,6 @@ const ScannerScreen = () => {
     firmwareVersion: '2.1.4',
     location: 'Main Counter'
   };
-  
-  // Animation for card detection
-  const [cardAnimation] = useState(new Animated.Value(0));
 
   // Check if merchant has assigned scanner on component mount
   useEffect(() => {
@@ -271,13 +263,26 @@ const ScannerScreen = () => {
         if (mDNSResponse.ok) {
           const data = await mDNSResponse.json();
           console.log('Found ESP32 via mDNS:', data);
-          setRfidReaderIP(data.ip);
+          
+          // Update the IP to the actual scanner IP
+          const actualIP = data.ip;
+          console.log('Setting rfidReaderIP to:', actualIP);
+          setRfidReaderIP(actualIP);
+          
+          // Store the scanner IP in AsyncStorage for use in other screens
+          try {
+            await AsyncStorage.setItem('scannerIP', actualIP);
+            console.log('Scanner IP saved to AsyncStorage:', actualIP);
+          } catch (error) {
+            console.error('Failed to save scanner IP to AsyncStorage:', error);
+          }
+          
           setScannerConnected(true);
           setSearching(false);
           setLastActive('just now');
           
           // Start polling for RFID tags
-          startRFIDPolling(data.ip);
+          startRFIDPolling(actualIP);
           return;
         }
       } catch (error) {
@@ -313,6 +318,14 @@ const ScannerScreen = () => {
             if (data && 'isConnected' in data) {
               console.log('Found ESP32 at IP:', ip);
               setRfidReaderIP(ip);
+              
+              // Store the scanner IP in AsyncStorage
+              AsyncStorage.setItem('scannerIP', ip).then(() => {
+                console.log('Scanner IP saved to AsyncStorage:', ip);
+              }).catch(error => {
+                console.error('Failed to save scanner IP to AsyncStorage:', error);
+              });
+              
               setScannerConnected(true);
               found = true;
               setLastActive('just now');
@@ -355,6 +368,14 @@ const ScannerScreen = () => {
                 if (data && 'isConnected' in data) {
                   console.log('Found ESP32 at IP:', ipToTry);
                   setRfidReaderIP(ipToTry);
+                  
+                  // Store the scanner IP in AsyncStorage
+                  AsyncStorage.setItem('scannerIP', ipToTry).then(() => {
+                    console.log('Scanner IP saved to AsyncStorage:', ipToTry);
+                  }).catch(error => {
+                    console.error('Failed to save scanner IP to AsyncStorage:', error);
+                  });
+                  
                   setScannerConnected(true);
                   found = true;
                   setLastActive('just now');
@@ -436,12 +457,29 @@ const ScannerScreen = () => {
         setScannerConnected(true);
         setLastActive('just now');
         
+        // Store the working IP in AsyncStorage
+        try {
+          await AsyncStorage.setItem('scannerIP', ip);
+          console.log('Scanner IP updated in AsyncStorage:', ip);
+        } catch (error) {
+          console.error('Failed to update scanner IP in AsyncStorage:', error);
+        }
+        
         // If the scanner is connected to WiFi, start polling
         if (data.isConnected) {
           // Update the IP if it has changed
           if (data.ip && data.ip !== ip && data.ip !== '0.0.0.0') {
             console.log('Updated scanner IP from', ip, 'to', data.ip);
             setRfidReaderIP(data.ip);
+            
+            // Update AsyncStorage with the new IP
+            try {
+              await AsyncStorage.setItem('scannerIP', data.ip);
+              console.log('Updated scanner IP in AsyncStorage:', data.ip);
+            } catch (error) {
+              console.error('Failed to update scanner IP in AsyncStorage:', error);
+            }
+            
             startRFIDPolling(data.ip);
             return data.ip; // Return the updated IP
           } else {
@@ -467,66 +505,17 @@ const ScannerScreen = () => {
     
     console.log('Starting RFID polling at IP:', ip);
     
-    // Store the last processed data to avoid duplicate processing
-    let lastProcessedUID = "";
-    let lastProcessedTimestamp = 0;
-    
-    // Set up a new polling interval
+    // Set up a new polling interval just to maintain connection
     window.rfidPollingInterval = setInterval(async () => {
       try {
         const response = await fetch(`http://${ip}/read-rfid`);
         
         if (response.ok) {
           const data = await response.json();
-          console.log('RFID data received:', data);
+          console.log('RFID polling active - scanner responsive');
           
-          // Only process if:
-          // 1. We have a valid UID
-          // 2. This is different from the last card we processed (either by UID or timestamp)
-          if (data.uid && data.uid.length > 0 && 
-              (data.uid !== lastProcessedUID || data.timestamp !== lastProcessedTimestamp)) {
-            
-            console.log('New RFID card detected:', data.uid);
-            
-            // Update our tracking variables
-            lastProcessedUID = data.uid;
-            lastProcessedTimestamp = data.timestamp;
-            
-            // Create a card object with timestamp
-            const newCard = {
-              uid: data.uid,
-              timestamp: new Date().toLocaleTimeString(),
-              id: Math.random().toString(36).substring(2, 10), // Random ID for FlatList
-            };
-            
-            // Update state
-            setLastScannedCard(newCard);
-            setLastActive('just now');
-            
-            // Add to history (only keep last 20)
-            setScanHistory(prevHistory => [
-              newCard,
-              ...prevHistory.slice(0, 19)
-            ]);
-            
-            // Trigger animation and vibration
-            Animated.sequence([
-              Animated.timing(cardAnimation, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(cardAnimation, {
-                toValue: 0,
-                duration: 300,
-                delay: 500,
-                useNativeDriver: true,
-              })
-            ]).start();
-            
-            // Vibrate the device
-            Vibration.vibrate(200);
-          }
+          // Just update last active time to show scanner is working
+          setLastActive('just now');
         }
       } catch (error) {
         console.error('RFID polling error:', error);
@@ -540,7 +529,7 @@ const ScannerScreen = () => {
           setScannerConnected(false);
         }
       }
-    }, 1000); // Poll every second
+    }, 3000); // Poll every 3 seconds just to maintain connection
   };
   
   // Handle manual refresh
@@ -570,32 +559,24 @@ const ScannerScreen = () => {
   
   // Navigate to create payment screen
   const navigateToCreatePayment = () => {
+    if (!scannerConnected) {
+      Alert.alert(
+        'Scanner Not Connected',
+        'Please connect to the scanner first before creating payments.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+    
+    console.log('Current rfidReaderIP state:', rfidReaderIP);
+    
+    // Navigate to payments (IP will be read from AsyncStorage)
     navigation.navigate('Payments');
   };
   
   // Navigate to wifi setup screen
   const navigateToWifiSetup = () => {
     navigation.navigate('WifiSetup');
-  };
-
-  // Animation style for card detection
-  const cardHighlightStyle = {
-    transform: [
-      {
-        scale: cardAnimation.interpolate({
-          inputRange: [0, 1],
-          outputRange: [1, 1.05]
-        })
-      }
-    ],
-    shadowOpacity: cardAnimation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.2, 0.8]
-    }),
-    backgroundColor: cardAnimation.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['#FFFFFF', '#FFF8F0']
-    })
   };
 
   // Show loading screen while checking assignment
@@ -1029,78 +1010,7 @@ const ScannerScreen = () => {
           </View>
         </View>
 
-        {/* Last Scanned Card - Show only when scanner is connected */}
-        {scannerConnected && lastScannedCard && (
-          <View style={styles.detailsSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Last Scanned Card</Text>
-            </View>
-            
-            <Animated.View style={[styles.detailsContainer, cardHighlightStyle, {padding: 20, alignItems: 'center'}]}>
-              <View style={styles.paymentActionIcon}>
-                <MaterialCommunityIcons name="credit-card-scan-outline" size={28} color="#FFFFFF" />
-              </View>
-              <Text style={{
-                fontSize: 20,
-                fontWeight: 'bold',
-                color: '#000000',
-                marginBottom: 8
-              }}>
-                {lastScannedCard.uid}
-              </Text>
-              <Text style={{
-                fontSize: 14,
-                color: '#666',
-              }}>
-                Scanned at {lastScannedCard.timestamp}
-              </Text>
-            </Animated.View>
-          </View>
-        )}
-        
-        {/* Scan History - Show only when scanner is connected and history exists */}
-        {scannerConnected && scanHistory.length > 0 && (
-          <View style={styles.detailsSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Scan History</Text>
-            </View>
-            
-            <View style={styles.detailsContainer}>
-              <FlatList
-                data={scanHistory.slice(0, 5)} // Show only the latest 5
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <View style={styles.detailItem}>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <MaterialCommunityIcons name="credit-card-scan" size={18} color="#ed7b0e" style={{marginRight: 8}} />
-                      <Text style={styles.detailValue}>{item.uid}</Text>
-                    </View>
-                    <Text style={{fontSize: 12, color: '#888'}}>{item.timestamp}</Text>
-                  </View>
-                )}
-                scrollEnabled={false}  // Disable scrolling for the nested list
-              />
-              
-              {scanHistory.length > 5 && (
-                <TouchableOpacity style={{
-                  paddingVertical: 12,
-                  paddingHorizontal: 15,
-                  alignItems: 'center',
-                  borderTopWidth: 1,
-                  borderTopColor: '#F0F0F0',
-                  marginTop: 5,
-                }}>
-                  <Text style={{
-                    fontSize: 14,
-                    color: '#ed7b0e',
-                    fontWeight: '600',
-                  }}>View All Scans</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        )}
-        
+
         {/* Accept Payment - Action Button */}
         <View style={styles.paymentActionContainer}>
           <TouchableOpacity 
