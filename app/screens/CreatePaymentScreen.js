@@ -149,68 +149,84 @@ const CreatePaymentScreen = () => {
   
   // Amount handlers
   const handleNumberPress = (number) => {
-    // If in PIN entry mode, handle PIN input
-    if (paymentStatus === 'enterPin') {
-      if (pin.length < PIN_LENGTH) {
-        setPin(pin + number);
-        setPinError('');
-      }
+  // If in PIN entry mode, handle PIN input
+  if (paymentStatus === 'enterPin') {
+    // Strict PIN length validation - prevent any input beyond PIN_LENGTH
+    if (pin.length >= PIN_LENGTH) {
+      console.log('PIN already at maximum length, ignoring input');
+      return; // Don't add any more digits
+    }
+    
+    // Only allow numeric input for PIN
+    if (!/^\d$/.test(number)) {
+      console.log('Non-numeric input for PIN, ignoring:', number);
       return;
     }
     
-    // Else handle amount input
-    if (amount.includes('.') && amount.split('.')[1].length >= 2) {
-      return;
-    }
+    const newPin = pin + number;
+    console.log('PIN input - Current:', pin, 'Adding:', number, 'New:', newPin, 'Length:', newPin.length);
     
-    if (!amount.includes('.') && amount.length >= 6) {
-      return; // Limit to 999,999
-    }
-    
-    if (amount === '0' && number !== '.') {
-      setAmount(number);
-      return;
-    }
-    
-    if (number === '.' && amount.includes('.')) {
-      return;
-    }
-    
-    if (number === '.' && amount === '') {
-      setAmount('0.');
-      return;
-    }
-    
-    setAmount(amount + number);
-    
-    if (errorMessage) {
-      setErrorMessage('');
-    }
-  };
+    setPin(newPin);
+    setPinError(''); // Clear any previous PIN errors
+    return;
+  }
+  
+  // Handle amount input (existing logic)
+  if (amount.includes('.') && amount.split('.')[1].length >= 2) {
+    return;
+  }
+  
+  if (!amount.includes('.') && amount.length >= 6) {
+    return; // Limit to 999,999
+  }
+  
+  if (amount === '0' && number !== '.') {
+    setAmount(number);
+    return;
+  }
+  
+  if (number === '.' && amount.includes('.')) {
+    return;
+  }
+  
+  if (number === '.' && amount === '') {
+    setAmount('0.');
+    return;
+  }
+  
+  setAmount(amount + number);
+  
+  if (errorMessage) {
+    setErrorMessage('');
+  }
+};
   
   const handleBackspace = () => {
-    if (paymentStatus === 'enterPin') {
-      if (pin.length > 0) {
-        setPin(pin.slice(0, -1));
-      }
-      return;
+  if (paymentStatus === 'enterPin') {
+    if (pin.length > 0) {
+      const newPin = pin.slice(0, -1);
+      console.log('PIN backspace - Current:', pin, 'New:', newPin, 'Length:', newPin.length);
+      setPin(newPin);
     }
-    
-    if (amount.length > 0) {
-      setAmount(amount.slice(0, -1));
-    }
-  };
+    return;
+  }
+  
+  if (amount.length > 0) {
+    setAmount(amount.slice(0, -1));
+  }
+};
   
   const handleClear = () => {
-    if (paymentStatus === 'enterPin') {
-      setPin('');
-      setPinError('');
-      return;
-    }
-    
-    setAmount('');
-    setErrorMessage('');
-  };
+  if (paymentStatus === 'enterPin') {
+    console.log('Clearing PIN');
+    setPin('');
+    setPinError('');
+    return;
+  }
+  
+  setAmount('');
+  setErrorMessage('');
+};
   
   const formatAmount = (value) => {
     if (!value || value === '') return '0.00';
@@ -394,88 +410,111 @@ const CreatePaymentScreen = () => {
   
   // Handle PIN submission
   const handlePinSubmit = async () => {
-    if (pin.length !== PIN_LENGTH) {
-      setPinError(`Please enter ${PIN_LENGTH} digit PIN`);
-      return;
-    }
-    
-    if (!scannedCard) {
-      setPinError('No card detected. Please try again.');
-      return;
-    }
-    
-    // Clear any previous errors
-    setPinError('');
-    
-    // Process payment with PIN verification
-    await processPayment();
-  };
+  console.log('=== PIN SUBMISSION ===');
+  console.log('Current PIN:', pin);
+  console.log('PIN Length:', pin.length);
+  console.log('Expected Length:', PIN_LENGTH);
+  
+  // Validate PIN length
+  if (pin.length !== PIN_LENGTH) {
+    const errorMsg = `Please enter ${PIN_LENGTH} digit PIN`;
+    console.log('PIN length validation failed:', errorMsg);
+    setPinError(errorMsg);
+    return;
+  }
+  
+  // Validate PIN contains only digits
+  if (!/^\d+$/.test(pin)) {
+    const errorMsg = 'PIN must contain only numbers';
+    console.log('PIN format validation failed:', errorMsg);
+    setPinError(errorMsg);
+    return;
+  }
+  
+  // Validate scanned card exists
+  if (!scannedCard || !scannedCard.uid) {
+    const errorMsg = 'No card detected. Please try again.';
+    console.log('Card validation failed:', errorMsg);
+    setPinError(errorMsg);
+    return;
+  }
+  
+  console.log('PIN validation passed, processing payment...');
+  
+  // Clear any previous errors
+  setPinError('');
+  
+  // Process payment with PIN verification
+  await processPayment();
+};
   
   // Process payment with backend integration
   const processPayment = async () => {
-    try {
-      // Transition to processing state
-      setPaymentStatus('processing');
-      
-      console.log('Processing payment...', {
-        cardUid: scannedCard.uid,
-        amount: parseFloat(amount),
-        pin: pin
-      });
-      
-      // Call backend API to process RFID payment
-      const response = await merchantAuthService.apiCall('/payments/rfid/process', {
-        method: 'POST',
-        body: JSON.stringify({
-          cardUid: scannedCard.uid,
-          pin: pin,
-          amount: parseFloat(amount),
-          description: `Payment at merchant - ${new Date().toLocaleString()}`
-        })
-      });
-      
-      if (response.status === 'success') {
-        // Payment successful
-        console.log('Payment successful:', response.data);
-        
-        setTransactionId(response.data.transactionReference);
-        setCustomerInfo({
-          newBalance: response.data.customerBalance,
-          merchantBalance: response.data.merchantBalance
-        });
-        
-        setPaymentStatus('success');
-        
-      } else {
-        // Payment failed
-        console.log('Payment failed:', response);
-        
-        // Handle specific error cases
-        if (response.data && response.data.remainingAttempts !== undefined) {
-          setPinAttempts(3 - response.data.remainingAttempts);
-          setMaxAttempts(3);
-          
-          if (response.data.isLocked) {
-            setErrorMessage('Card is locked due to too many failed PIN attempts');
-          } else {
-            setPinError(`Invalid PIN. ${response.data.remainingAttempts} attempts remaining.`);
-            setPaymentStatus('enterPin'); // Stay on PIN entry for retry
-            setPin(''); // Clear PIN for retry
-            return;
-          }
-        } else {
-          setErrorMessage(response.message || 'Payment processing failed');
-        }
-        
-        setPaymentStatus('failed');
-      }
-      
-    } catch (error) {
-      console.error('Payment processing error:', error);
-      setErrorMessage('Network error. Please check your connection and try again.');
-      setPaymentStatus('failed');
+  try {
+    setPaymentStatus('processing');
+    
+    console.log('=== PAYMENT PROCESSING ===');
+    
+    // Final validation before API call
+    if (!scannedCard?.uid) {
+      throw new Error('No card detected');
     }
-  };
+    
+    if (!pin || pin.length !== PIN_LENGTH) {
+      throw new Error(`Invalid PIN length: ${pin.length}, expected: ${PIN_LENGTH}`);
+    }
+    
+    if (!/^\d+$/.test(pin)) {
+      throw new Error('PIN contains invalid characters');
+    }
+    
+    if (!amount || parseFloat(amount) <= 0) {
+      throw new Error('Invalid amount');
+    }
+    
+    // Prepare clean payload
+    const payloadData = {
+      cardUid: scannedCard.uid.trim(),
+      pin: pin.trim(), // Ensure PIN is clean string
+      amount: parseFloat(amount),
+      description: `Payment at merchant - ${new Date().toLocaleString()}`
+    };
+    
+    console.log('Payload validation:');
+    console.log('- cardUid:', payloadData.cardUid, 'length:', payloadData.cardUid.length);
+    console.log('- pin:', payloadData.pin, 'length:', payloadData.pin.length, 'isNumeric:', /^\d+$/.test(payloadData.pin));
+    console.log('- amount:', payloadData.amount, 'type:', typeof payloadData.amount);
+    
+    const response = await merchantAuthService.apiCall('/payments/rfid/process', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payloadData)
+    });
+    
+    console.log('Payment API response:', response);
+    
+    if (response.status === 'success') {
+      console.log('Payment successful');
+      
+      setTransactionId(response.data.transactionReference || `TXN${Date.now()}`);
+      setCustomerInfo({
+        newBalance: response.data.customerBalance,
+        merchantBalance: response.data.merchantBalance
+      });
+      
+      setPaymentStatus('success');
+    } else {
+      console.log('Payment failed:', response.message);
+      handlePaymentFailure(response);
+    }
+    
+  } catch (error) {
+    console.error('Payment processing error:', error);
+    handlePaymentError(error);
+  }
+};
   
   const resetPayment = () => {
     // Stop animations
@@ -559,49 +598,58 @@ const CreatePaymentScreen = () => {
   };
   
   const renderNumberPad = () => {
-    const keys = [
-      { value: '1' }, { value: '2' }, { value: '3' },
-      { value: '4' }, { value: '5' }, { value: '6' },
-      { value: '7' }, { value: '8' }, { value: '9' },
-      { value: '.' }, { value: '0' }, { value: 'del', icon: 'backspace-outline' }
-    ];
-    
-    // For PIN entry, don't allow decimal point
-    if (paymentStatus === 'enterPin') {
-      keys[9] = { value: '', disabled: true };
-    }
-    
-    return (
-      <View style={styles.numberPad}>
-        {keys.map((key, index) => (
+  const keys = [
+    { value: '1' }, { value: '2' }, { value: '3' },
+    { value: '4' }, { value: '5' }, { value: '6' },
+    { value: '7' }, { value: '8' }, { value: '9' },
+    { value: '.' }, { value: '0' }, { value: 'del', icon: 'backspace-outline' }
+  ];
+  
+  // For PIN entry, disable decimal point and limit input
+  if (paymentStatus === 'enterPin') {
+    keys[9] = { value: '', disabled: true }; // Disable decimal point
+  }
+  
+  return (
+    <View style={styles.numberPad}>
+      {keys.map((key, index) => {
+        // Additional validation for PIN mode
+        const isPinMode = paymentStatus === 'enterPin';
+        const isPinFull = isPinMode && pin.length >= PIN_LENGTH && key.value !== 'del' && key.value !== '';
+        const isDisabled = key.disabled || isPinFull;
+        
+        return (
           <TouchableOpacity
             key={`key-${index}`}
             style={[
               styles.numberKey,
-              key.disabled ? styles.disabledKey : {}
+              isDisabled ? styles.disabledKey : {}
             ]}
-            activeOpacity={key.disabled ? 1 : 0.7}
+            activeOpacity={isDisabled ? 1 : 0.7}
             onPress={() => {
-              if (key.disabled) return;
+              if (isDisabled) return;
               
               if (key.value === 'del') {
                 handleBackspace();
-              } else {
+              } else if (key.value !== '') {
                 handleNumberPress(key.value.toString());
               }
             }}
-            disabled={key.disabled}
+            disabled={isDisabled}
           >
             {key.icon ? (
-              <Ionicons name={key.icon} size={24} color="#000" />
+              <Ionicons name={key.icon} size={24} color={isDisabled ? "#ccc" : "#000"} />
             ) : (
-              <Text style={styles.keyText}>{key.value}</Text>
+              <Text style={[styles.keyText, isDisabled ? { color: '#ccc' } : {}]}>
+                {key.value}
+              </Text>
             )}
           </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
+        );
+      })}
+    </View>
+  );
+};
   
   // Render different content based on payment status
   const renderPaymentContent = () => {
