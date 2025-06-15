@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "tapyze-merchant",
+    "name": "Tapyze Merchant",
     "slug": "tapyze-merchant",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,21 +8,71 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./app/assets/splash-icon.png",
+      "image": "./app/assets/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tapyze.merchant",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to RFID scanners for payment processing.",
+        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect to RFID scanners for payment processing.",
+        "NSLocationWhenInUseUsageDescription": "Location access is required for Bluetooth device scanning on iOS.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "deploymentTarget": "11.0"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./app/assets/adaptive-icon.png",
+        "foregroundImage": "./app/assets/logo.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.tapyze.merchant",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ],
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34
     },
     "web": {
       "favicon": "./app/assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": [
+            "central"
+          ],
+          "bluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to RFID scanners for payment processing."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "72cae292-08dc-407f-ae94-422f7bfedaec"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/72cae292-08dc-407f-ae94-422f7bfedaec"
     }
   }
 }

@@ -10,23 +10,36 @@ import {
   RefreshControl,
   Image,
   SafeAreaView,
+  Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import NetInfo from "@react-native-community/netinfo";
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Device from 'expo-device';
 import merchantAuthService from '../services/merchantAuthService';
 import merchantDeviceService from '../services/merchantDeviceService';
 
 // Import styles
 import styles from '../styles/ScannerScreenStyles';
 
+// BLE Service and Characteristic UUIDs (must match ESP32)
+const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
+const RFID_CHAR_UUID = '12345678-1234-1234-1234-123456789abd';
+const STATUS_CHAR_UUID = '12345678-1234-1234-1234-123456789abe';
+const CONFIG_CHAR_UUID = '12345678-1234-1234-1234-123456789abf';
+const CONTROL_CHAR_UUID = '12345678-1234-1234-1234-123456789ac0';
+
 const ScannerScreen = () => {
-  // Get the navigation object
   const navigation = useNavigation();
   
+  // BLE Manager - with error handling
+  const [manager, setManager] = useState(null);
+  const [bleAvailable, setBleAvailable] = useState(false);
+  const [bleError, setBleError] = useState(null);
+  
   // Scanner assignment states
-  const [hasAssignedScanner, setHasAssignedScanner] = useState(null); // null = loading, true/false = checked
+  const [hasAssignedScanner, setHasAssignedScanner] = useState(null);
   const [assignedScanner, setAssignedScanner] = useState(null);
   const [isCheckingAssignment, setIsCheckingAssignment] = useState(true);
   
@@ -46,91 +59,241 @@ const ScannerScreen = () => {
     { label: 'Tapyze Mini', value: 'tapyze-mini' },
   ];
   
-  // RFID scanner states
-  const [rfidReaderIP, setRfidReaderIP] = useState('192.168.4.1'); // Default setup IP
+  // BLE scanner states
+  const [connectedDevice, setConnectedDevice] = useState(null);
   const [scannerConnected, setScannerConnected] = useState(false);
-  const [searching, setSearching] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [networkInfo, setNetworkInfo] = useState(null);
   const [lastActive, setLastActive] = useState('Never');
-  const [loading, setLoading] = useState(false);
+  const [bluetoothState, setBluetoothState] = useState('Unknown');
+  const [discoveredDevices, setDiscoveredDevices] = useState([]);
+  const [scannerStatus, setScannerStatus] = useState(null);
+  const [lastRfidData, setLastRfidData] = useState(null);
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
   
   // Scanner details
   const defaultScannerDetails = {
     name: 'RFID Card Reader',
     scannerId: 'TPZ-5423-RFID',
-    firmwareVersion: '2.1.4',
+    firmwareVersion: '2.0.0-BLE',
     location: 'Main Counter'
   };
 
-  // Check if merchant has assigned scanner on component mount
+  // Initialize BLE with proper error handling
   useEffect(() => {
-    checkScannerAssignment();
+    const initializeBLE = async () => {
+      try {
+        // Check if we're on a physical device
+        if (!Device.isDevice) {
+          setBleError('Physical device required for Bluetooth functionality');
+          return;
+        }
+
+        // Try to import and initialize BLE manager
+        const { BleManager } = await import('react-native-ble-plx');
+        
+        if (!BleManager) {
+          setBleError('BLE Manager not available - may need development build');
+          return;
+        }
+
+        const bleManager = new BleManager();
+        setManager(bleManager);
+        setBleAvailable(true);
+        
+        // Monitor Bluetooth state
+        const subscription = bleManager.onStateChange((state) => {
+          handleBluetoothState(state);
+        }, true);
+        
+        console.log('BLE Manager initialized successfully');
+        
+        return () => {
+          if (subscription) subscription.remove();
+          if (bleManager) bleManager.destroy();
+        };
+        
+      } catch (error) {
+        console.error('BLE initialization error:', error);
+        setBleError(`BLE not available: ${error.message}`);
+        
+        // Show user-friendly error message
+        if (error.message.includes('Native module cannot be null')) {
+          setBleError('Development build required for BLE functionality. Cannot use Expo Go.');
+        } else {
+          setBleError(`BLE initialization failed: ${error.message}`);
+        }
+      }
+    };
+
+    initializeBLE();
   }, []);
 
-  // Initialize and check network status only after scanner assignment is confirmed
-  useEffect(() => {
-    if (hasAssignedScanner === true) {
-      checkNetworkStatus();
+  // Request permissions - store permission state
+  const requestBLEPermissions = async () => {
+    try {
+      if (!Device.isDevice) {
+        Alert.alert(
+          'Physical Device Required',
+          'Bluetooth functionality requires a physical device. BLE does not work in simulators.'
+        );
+        return false;
+      }
+
+      if (!bleAvailable) {
+        Alert.alert(
+          'BLE Not Available',
+          bleError || 'Bluetooth Low Energy is not available on this device.'
+        );
+        return false;
+      }
+
+      // Check if permissions were already granted
+      const permissionGranted = await AsyncStorage.getItem('blePermissionGranted');
+      if (permissionGranted === 'true') {
+        setPermissionsGranted(true);
+        return true;
+      }
+
+      if (Platform.OS === 'android') {
+        // For Android, guide user to settings
+        Alert.alert(
+          'Bluetooth Permissions Required',
+          'This app needs Bluetooth and location permissions to scan for devices.\n\n1. Grant Location permission\n2. Grant Nearby devices permission\n3. Enable Location services',
+          [
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                Linking.openSettings();
+              }
+            },
+            {
+              text: 'I\'ve granted permissions',
+              onPress: async () => {
+                setPermissionsGranted(true);
+                await AsyncStorage.setItem('blePermissionGranted', 'true');
+                console.log('User confirmed permissions granted');
+              }
+            }
+          ]
+        );
+      } else {
+        console.log('iOS: BLE permissions will be requested automatically when needed');
+        setPermissionsGranted(true);
+        await AsyncStorage.setItem('blePermissionGranted', 'true');
+      }
+
+      return true;
       
-      // Set up network state change listener
-      const unsubscribe = NetInfo.addEventListener(state => {
-        if (state.isConnected && state.type === 'wifi') {
-          checkNetworkStatus();
-        }
-      });
-      
-      return () => {
-        unsubscribe();
-      };
+    } catch (error) {
+      console.error('Permission setup error:', error);
+      Alert.alert(
+        'Permission Error',
+        'Failed to set up Bluetooth permissions. Please check your device settings.'
+      );
+      return false;
     }
-  }, [hasAssignedScanner]);
+  };
+
+  // Platform-specific Bluetooth state handling
+  const handleBluetoothState = (state) => {
+    console.log('Bluetooth state changed:', state);
+    setBluetoothState(state);
+    
+    switch (state) {
+      case 'PoweredOff':
+        setScannerConnected(false);
+        setConnectedDevice(null);
+        Alert.alert(
+          'Bluetooth Required',
+          'Please turn on Bluetooth to connect to your scanner.'
+        );
+        break;
+        
+      case 'Unauthorized':
+        Alert.alert(
+          'Bluetooth Permission Required',
+          'Please allow Bluetooth access for this app in Settings.',
+          [
+            {
+              text: 'Open Settings',
+              onPress: () => Linking.openSettings()
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+        break;
+        
+      case 'PoweredOn':
+        console.log('Bluetooth is ready');
+        if (hasAssignedScanner === true && !scannerConnected) {
+          autoConnectToSavedScanner();
+        }
+        break;
+        
+      case 'Unsupported':
+        Alert.alert(
+          'Bluetooth Not Supported',
+          'This device does not support Bluetooth Low Energy.'
+        );
+        break;
+        
+      default:
+        console.log(`Bluetooth state: ${state}`);
+    }
+  };
+
+  // Check scanner assignment on mount
+  useFocusEffect(
+    React.useCallback(() => {
+      checkScannerAssignment();
+    }, [])
+  );
+
+  // Auto-connect when conditions are met
+  useEffect(() => {
+    if (hasAssignedScanner === true && bluetoothState === 'PoweredOn' && permissionsGranted && manager) {
+      autoConnectToSavedScanner();
+    }
+  }, [hasAssignedScanner, bluetoothState, permissionsGranted, manager]);
+
+  // Permission setup when BLE becomes available
+  useEffect(() => {
+    if (bleAvailable && !permissionsGranted) {
+      requestBLEPermissions();
+    }
+  }, [bleAvailable]);
 
   // Function to check if merchant has assigned scanner
   const checkScannerAssignment = async () => {
     try {
       setIsCheckingAssignment(true);
       
-      // Check if user is authenticated using your auth service
       const isAuth = await merchantAuthService.isAuthenticated();
       if (!isAuth) {
-        console.log('User not authenticated');
         Alert.alert('Error', 'Please log in again');
-        navigation.navigate('Login');
+        navigation.navigate('Auth');
         return;
       }
 
-      console.log('User authenticated, checking scanners...');
-
-      // Use device service to get scanners
       const result = await merchantDeviceService.getMerchantScanners();
       
       if (result.success) {
-        console.log('Scanner check result:', result);
-        
         if (result.count > 0 && result.scanners.length > 0) {
-          // Merchant has assigned scanners
           setHasAssignedScanner(true);
-          setAssignedScanner(result.scanners[0]); // Use the first scanner
+          setAssignedScanner(result.scanners[0]);
           
-          // Update scanner details with assigned scanner info
           const scanner = result.scanners[0];
           setModel(scanner.model || '');
           setFirmwareVersion(scanner.firmwareVersion || '');
           setDeviceId(scanner.deviceId || '');
-          
-          console.log('Scanner found:', scanner);
         } else {
-          // No assigned scanners
-          console.log('No scanners found for merchant');
           setHasAssignedScanner(false);
         }
       } else {
-        // Handle API error
-        if (result.message && (result.message.includes('401') || result.message.includes('Unauthorized'))) {
-          console.log('401 Unauthorized - Token may be invalid');
+        if (result.message && result.message.includes('401')) {
           Alert.alert('Session Expired', 'Please log in again');
-          navigation.navigate('Login');
+          navigation.navigate('Auth');
         } else {
           throw new Error(result.message || 'Failed to check scanner assignment');
         }
@@ -139,16 +302,10 @@ const ScannerScreen = () => {
       console.error('Error checking scanner assignment:', error);
       Alert.alert(
         'Error',
-        `Failed to check scanner assignment: ${error.message}. Please try again.`,
+        `Failed to check scanner assignment: ${error.message}`,
         [
-          {
-            text: 'Retry',
-            onPress: checkScannerAssignment
-          },
-          {
-            text: 'Skip for now',
-            onPress: () => setHasAssignedScanner(false)
-          }
+          { text: 'Retry', onPress: checkScannerAssignment },
+          { text: 'Skip for now', onPress: () => setHasAssignedScanner(false) }
         ]
       );
     } finally {
@@ -166,26 +323,20 @@ const ScannerScreen = () => {
     try {
       setIsAssigning(true);
       
-      // Check if user is authenticated
       const isAuth = await merchantAuthService.isAuthenticated();
       if (!isAuth) {
         Alert.alert('Error', 'Please log in again');
-        navigation.navigate('Login');
+        navigation.navigate('Auth');
         return;
       }
 
       const scannerData = {
         deviceId: deviceId.trim(),
         model: model.trim(),
-        firmwareVersion: firmwareVersion.trim() || '1.0.0'
+        firmwareVersion: firmwareVersion.trim() || '2.0.0-BLE'
       };
 
-      console.log('Assigning scanner with data:', scannerData);
-
-      // Use device service to assign scanner
       const result = await merchantDeviceService.assignScanner(scannerData);
-
-      console.log('Assignment response:', result);
 
       if (result.success) {
         Alert.alert(
@@ -200,383 +351,431 @@ const ScannerScreen = () => {
           }]
         );
       } else {
-        Alert.alert(
-          'Error',
-          result.message || 'Failed to assign scanner. Please try again.'
-        );
+        Alert.alert('Error', result.message || 'Failed to assign scanner');
       }
     } catch (error) {
       console.error('Error assigning scanner:', error);
-      
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+      if (error.message.includes('401')) {
         Alert.alert('Session Expired', 'Please log in again');
-        navigation.navigate('Login');
+        navigation.navigate('Auth');
       } else {
-        Alert.alert(
-          'Error',
-          error.message || 'Network error. Please check your connection and try again.'
-        );
+        Alert.alert('Error', error.message || 'Network error');
       }
     } finally {
       setIsAssigning(false);
     }
   };
-  
-  // Function to check network status
-  const checkNetworkStatus = async () => {
-    try {
-      const netState = await NetInfo.fetch();
-      setNetworkInfo(netState);
-      
-      if (netState.isConnected && netState.type === 'wifi') {
-        // Check if we already know the scanner's IP
-        if (rfidReaderIP) {
-          checkScannerStatus(rfidReaderIP);
-        } else {
-          // Otherwise try to find it
-          findScannerOnNetwork();
-        }
-      } else {
-        Alert.alert(
-          'Network Connection Required',
-          'Please connect to a WiFi network to use this app.'
-        );
-      }
-    } catch (error) {
-      console.error('Network status check error:', error);
+
+  // Scan for devices - only if BLE is available
+  const scanForDevices = async () => {
+    if (!manager || !bleAvailable) {
+      Alert.alert(
+        'BLE Not Available',
+        bleError || 'Bluetooth Low Energy is not available. You may need a development build instead of Expo Go.'
+      );
+      return;
     }
-  };
-  
-  // Find RFID Scanner on the network using common IP addresses
-  const findScannerOnNetwork = async () => {
-    setSearching(true);
-    setScannerConnected(false);
+
+    if (bluetoothState !== 'PoweredOn') {
+      Alert.alert(
+        'Bluetooth Required',
+        'Please turn on Bluetooth to scan for devices'
+      );
+      return;
+    }
+
+    // Check permissions before scanning
+    if (!permissionsGranted) {
+      Alert.alert(
+        'Permissions Required',
+        'Please grant Bluetooth and location permissions in Settings > Apps > Tapyze Merchant > Permissions',
+        [
+          {
+            text: 'Open Settings',
+            onPress: () => Linking.openSettings()
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+      return;
+    }
+
+    setScanning(true);
+    setDiscoveredDevices([]);
     
     try {
-      // Try mDNS hostname first
-      try {
-        console.log('Trying mDNS hostname (rfidreader.local)...');
-        const mDNSResponse = await fetch('http://rfidreader.local/status', { 
-          timeout: 3000 
-        });
-        
-        if (mDNSResponse.ok) {
-          const data = await mDNSResponse.json();
-          console.log('Found ESP32 via mDNS:', data);
+      console.log('Starting BLE scan...');
+      manager.stopDeviceScan();
+      
+      manager.startDeviceScan(null, null, (error, device) => {
+        if (error) {
+          console.error('Scan error:', error);
+          setScanning(false);
           
-          // Update the IP to the actual scanner IP
-          const actualIP = data.ip;
-          console.log('Setting rfidReaderIP to:', actualIP);
-          setRfidReaderIP(actualIP);
-          
-          // Store the scanner IP in AsyncStorage for use in other screens
-          try {
-            await AsyncStorage.setItem('scannerIP', actualIP);
-            console.log('Scanner IP saved to AsyncStorage:', actualIP);
-          } catch (error) {
-            console.error('Failed to save scanner IP to AsyncStorage:', error);
+          // Handle specific BLE errors
+          if (error.message.includes('not authorized')) {
+            Alert.alert(
+              'Permission Denied',
+              'Bluetooth permission denied. Please enable Location and Nearby devices permissions in Settings > Apps > Tapyze Merchant > Permissions',
+              [
+                {
+                  text: 'Open Settings',
+                  onPress: () => Linking.openSettings()
+                },
+                { text: 'OK', style: 'cancel' }
+              ]
+            );
+          } else if (error.message.includes('location')) {
+            Alert.alert(
+              'Location Required',
+              'Location services must be enabled for Bluetooth scanning. Please enable Location in Settings.',
+              [
+                {
+                  text: 'Open Settings', 
+                  onPress: () => Linking.openSettings()
+                },
+                { text: 'OK', style: 'cancel' }
+              ]
+            );
+          } else {
+            Alert.alert('Scan Error', `Failed to scan: ${error.message}`);
           }
-          
-          setScannerConnected(true);
-          setSearching(false);
-          setLastActive('just now');
-          
-          // Start polling for RFID tags
-          startRFIDPolling(actualIP);
           return;
         }
-      } catch (error) {
-        console.log('mDNS lookup failed, trying IP scan');
-      }
-      
-      // If mDNS fails, try the common IP addresses directly
-      const commonIPs = [
-        '192.168.1.1', '192.168.1.100', '192.168.1.101', '192.168.1.150', '192.168.1.200',
-        '192.168.0.1', '192.168.0.100', '192.168.0.101', '192.168.0.150', '192.168.0.200',
-        '192.168.2.1', '192.168.2.100', '192.168.2.101', '192.168.2.150', '192.168.2.200',
-        '10.0.0.1', '10.0.0.100', '10.0.0.101', '10.0.0.150', '10.0.0.200',
-      ];
-      
-      // Try known common addresses
-      console.log('Trying common IP addresses...');
-      let found = false;
-      
-      for (const ip of commonIPs) {
-        if (found) break;
         
-        console.log('Trying IP:', ip);
-        
-        try {
-          const response = await fetch(`http://${ip}/status`, { 
-            timeout: 1000 
-          });
+        if (device && device.name) {
+          const isTargetDevice = 
+            device.name.toLowerCase().includes('tapyze') ||
+            device.name.toLowerCase().includes('scanner') ||
+            device.name === 'TapyzeScanner';
           
-          if (response.ok) {
-            const data = await response.json();
-            
-            // Verify this is our ESP32 by checking response format
-            if (data && 'isConnected' in data) {
-              console.log('Found ESP32 at IP:', ip);
-              setRfidReaderIP(ip);
-              
-              // Store the scanner IP in AsyncStorage
-              AsyncStorage.setItem('scannerIP', ip).then(() => {
-                console.log('Scanner IP saved to AsyncStorage:', ip);
-              }).catch(error => {
-                console.error('Failed to save scanner IP to AsyncStorage:', error);
-              });
-              
-              setScannerConnected(true);
-              found = true;
-              setLastActive('just now');
-              
-              // Start polling for RFID tags
-              startRFIDPolling(ip);
-            }
+          if (isTargetDevice) {
+            console.log('Found target device:', device.name);
+            setDiscoveredDevices(prev => {
+              const exists = prev.find(d => d.id === device.id);
+              if (!exists) {
+                return [...prev, {
+                  id: device.id,
+                  name: device.name,
+                  rssi: device.rssi
+                }];
+              }
+              return prev;
+            });
           }
-        } catch (error) {
-          // Continue trying next IP
         }
+      });
+      
+      setTimeout(() => {
+        manager.stopDeviceScan();
+        setScanning(false);
+        console.log('BLE scan completed');
+      }, 15000);
+      
+    } catch (error) {
+      console.error('Error starting scan:', error);
+      setScanning(false);
+      Alert.alert('Scan Error', `Failed to start scanning: ${error.message}`);
+    }
+  };
+
+  // Connect to device - only if BLE is available
+  const connectToDevice = async (deviceId) => {
+    if (!manager) {
+      Alert.alert('Error', 'BLE Manager not available');
+      return;
+    }
+
+    try {
+      console.log('Connecting to device:', deviceId);
+      const device = await manager.connectToDevice(deviceId);
+      
+      // Request larger MTU for better data transfer
+      try {
+        await device.requestMTU(512);
+        console.log('MTU requested: 512');
+      } catch (mtuError) {
+        console.log('MTU request failed, using default:', mtuError.message);
       }
       
-      // If still not found, try IP range scan (10 IPs at a time)
-      if (!found) {
-        console.log('Trying targeted IP range scan...');
-        
-        // If we know the device's IP, try to guess the subnet
-        if (networkInfo?.details?.ipAddress) {
-          const deviceIP = networkInfo.details.ipAddress;
-          const ipParts = deviceIP.split('.');
-          const subnet = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
+      await device.discoverAllServicesAndCharacteristics();
+      
+      // Set up characteristic monitoring for RFID data
+      await setupCharacteristicMonitoring(device);
+      
+      setConnectedDevice(device);
+      setScannerConnected(true);
+      setLastActive('just now');
+      
+      await AsyncStorage.setItem('savedScannerDeviceId', deviceId);
+      console.log('Connected successfully');
+      
+    } catch (error) {
+      console.error('Connection error:', error);
+      Alert.alert('Connection Error', `Failed to connect: ${error.message}`);
+    }
+  };
+
+  // Set up characteristic monitoring for RFID data
+  const setupCharacteristicMonitoring = async (device) => {
+    try {
+      console.log('Setting up RFID characteristic monitoring...');
+      
+      // Buffer for collecting fragmented data
+      let rfidBuffer = '';
+      let statusBuffer = '';
+      
+      // Monitor RFID characteristic for incoming card data
+      device.monitorCharacteristicForService(
+        SERVICE_UUID,
+        RFID_CHAR_UUID,
+        (error, characteristic) => {
+          if (error) {
+            console.error('RFID monitoring error:', error);
+            if (error.errorCode === 6) {
+              handleDeviceDisconnection();
+            }
+            return;
+          }
           
-          // Scan first 20 addresses in subnet
-          for (let i = 1; i <= 20; i++) {
-            if (found) break;
-            
-            const ipToTry = `${subnet}.${i}`;
-            console.log('Scanning IP:', ipToTry);
-            
+          if (characteristic?.value) {
             try {
-              const response = await fetch(`http://${ipToTry}/status`, { 
-                timeout: 800 
-              });
+              const rawData = atob(characteristic.value);
+              console.log('Raw RFID data received:', rawData);
               
-              if (response.ok) {
-                const data = await response.json();
+              if (!rawData || rawData.trim() === '') {
+                console.log('Empty RFID data received, skipping...');
+                return;
+              }
+              
+              // Try to parse immediately, or buffer if incomplete
+              try {
+                const data = JSON.parse(rawData);
+                console.log('Parsed RFID data:', data);
                 
-                // Verify this is our ESP32
-                if (data && 'isConnected' in data) {
-                  console.log('Found ESP32 at IP:', ipToTry);
-                  setRfidReaderIP(ipToTry);
-                  
-                  // Store the scanner IP in AsyncStorage
-                  AsyncStorage.setItem('scannerIP', ipToTry).then(() => {
-                    console.log('Scanner IP saved to AsyncStorage:', ipToTry);
-                  }).catch(error => {
-                    console.error('Failed to save scanner IP to AsyncStorage:', error);
-                  });
-                  
-                  setScannerConnected(true);
-                  found = true;
+                const uid = data.uid;
+                const timestamp = data.timestamp || data.time;
+                
+                if (uid && timestamp) {
+                  const rfidData = { uid, timestamp };
+                  setLastRfidData(rfidData);
                   setLastActive('just now');
                   
-                  // Start polling for RFID tags
-                  startRFIDPolling(ipToTry);
+                  AsyncStorage.setItem('lastRfidScan', JSON.stringify(rfidData))
+                    .catch(error => console.error('Failed to save RFID data:', error));
+                    
+                  Alert.alert(
+                    'Card Scanned! 🎉',
+                    `UID: ${uid}`,
+                    [{ text: 'OK' }]
+                  );
+                }
+                rfidBuffer = ''; // Clear buffer on success
+              } catch (parseError) {
+                // Data might be fragmented, try buffering
+                rfidBuffer += rawData;
+                console.log('Buffering RFID data, current buffer:', rfidBuffer);
+                
+                try {
+                  const data = JSON.parse(rfidBuffer);
+                  console.log('Parsed buffered RFID data:', data);
+                  
+                  const uid = data.uid;
+                  const timestamp = data.timestamp || data.time;
+                  
+                  if (uid && timestamp) {
+                    const rfidData = { uid, timestamp };
+                    setLastRfidData(rfidData);
+                    setLastActive('just now');
+                    
+                    AsyncStorage.setItem('lastRfidScan', JSON.stringify(rfidData))
+                      .catch(error => console.error('Failed to save RFID data:', error));
+                      
+                    Alert.alert(
+                      'Card Scanned! 🎉',
+                      `UID: ${uid}`,
+                      [{ text: 'OK' }]
+                    );
+                  }
+                  rfidBuffer = ''; // Clear buffer on success
+                } catch (bufferError) {
+                  console.log('Buffer still incomplete, waiting for more data...');
+                  // Keep buffering
                 }
               }
             } catch (error) {
-              // Continue trying next IP
+              console.error('Error processing RFID data:', error);
+              rfidBuffer = ''; // Reset buffer on error
             }
           }
         }
-      }
-      
-      if (!found) {
-        Alert.alert(
-          'Scanner Not Found',
-          'Could not find the RFID scanner on your network. Make sure it is connected to the same WiFi network, or enter the IP address manually.',
-          [
-            {
-              text: 'Enter IP Manually',
-              onPress: () => showManualIPPrompt()
-            },
-            {
-              text: 'OK',
-              style: 'cancel'
-            }
-          ]
-        );
-      }
-      
-    } catch (error) {
-      console.error('Error finding scanner:', error);
-      Alert.alert(
-        'Network Error',
-        'Error scanning the network: ' + error.message
       );
-    } finally {
-      setSearching(false);
+      
+      // Monitor status characteristic with buffering
+      device.monitorCharacteristicForService(
+        SERVICE_UUID,
+        STATUS_CHAR_UUID,
+        (error, characteristic) => {
+          if (error) {
+            console.error('Status monitoring error:', error);
+            return;
+          }
+          
+          if (characteristic?.value) {
+            try {
+              const rawData = atob(characteristic.value);
+              console.log('Raw status data received:', rawData);
+              
+              if (!rawData || rawData.trim() === '') {
+                console.log('Empty status data received, skipping...');
+                return;
+              }
+              
+              try {
+                const data = JSON.parse(rawData);
+                console.log('Parsed status data:', data);
+                setScannerStatus(data);
+                setLastActive('just now');
+                statusBuffer = ''; // Clear buffer on success
+              } catch (parseError) {
+                // Try buffering
+                statusBuffer += rawData;
+                console.log('Buffering status data, current buffer:', statusBuffer);
+                
+                try {
+                  const data = JSON.parse(statusBuffer);
+                  console.log('Parsed buffered status data:', data);
+                  setScannerStatus(data);
+                  setLastActive('just now');
+                  statusBuffer = ''; // Clear buffer on success
+                } catch (bufferError) {
+                  console.log('Status buffer still incomplete...');
+                }
+              }
+            } catch (error) {
+              console.error('Error processing status data:', error);
+              statusBuffer = ''; // Reset buffer on error
+            }
+          }
+        }
+      );
+      
+      console.log('Characteristic monitoring setup complete');
+      
+    } catch (error) {
+      console.error('Error setting up monitoring:', error);
+      Alert.alert(
+        'Setup Error',
+        'Failed to set up device communication. Please reconnect to the scanner.'
+      );
     }
   };
-  
-  // Prompt for manual IP entry
-  const showManualIPPrompt = () => {
-    Alert.prompt(
-      'Enter Scanner IP',
-      'Please enter the IP address of your RFID scanner:',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
-        {
-          text: 'Connect',
-          onPress: (ip) => {
-            if (ip && ip.trim()) {
-              setRfidReaderIP(ip.trim());
-              checkScannerStatus(ip.trim());
-            }
-          }
-        }
-      ],
-      'plain-text',
-      '',
-      'numeric'
-    );
+
+  // Handle device disconnection
+  const handleDeviceDisconnection = () => {
+    console.log('Device disconnected');
+    setScannerConnected(false);
+    setConnectedDevice(null);
+    setLastActive('Disconnected');
+    
+    // Try to auto-reconnect after a delay
+    setTimeout(() => {
+      if (!scannerConnected && bluetoothState === 'PoweredOn') {
+        autoConnectToSavedScanner();
+      }
+    }, 3000);
   };
-  
-  // Function to check if a specific IP is our scanner
-  const checkScannerStatus = async (ip) => {
+
+  // Send control command to scanner
+  const sendControlCommand = async (command) => {
+    if (!connectedDevice) {
+      Alert.alert('Error', 'No device connected');
+      return;
+    }
+
     try {
-      console.log('Checking scanner status at IP:', ip);
-      const response = await fetch(`http://${ip}/status`, { timeout: 3000 });
+      const commandJson = JSON.stringify(command);
+      console.log('Sending control command:', commandJson);
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Scanner status response:', data);
-        setScannerConnected(true);
-        setLastActive('just now');
-        
-        // Store the working IP in AsyncStorage
-        try {
-          await AsyncStorage.setItem('scannerIP', ip);
-          console.log('Scanner IP updated in AsyncStorage:', ip);
-        } catch (error) {
-          console.error('Failed to update scanner IP in AsyncStorage:', error);
-        }
-        
-        // If the scanner is connected to WiFi, start polling
-        if (data.isConnected) {
-          // Update the IP if it has changed
-          if (data.ip && data.ip !== ip && data.ip !== '0.0.0.0') {
-            console.log('Updated scanner IP from', ip, 'to', data.ip);
-            setRfidReaderIP(data.ip);
-            
-            // Update AsyncStorage with the new IP
-            try {
-              await AsyncStorage.setItem('scannerIP', data.ip);
-              console.log('Updated scanner IP in AsyncStorage:', data.ip);
-            } catch (error) {
-              console.error('Failed to update scanner IP in AsyncStorage:', error);
-            }
-            
-            startRFIDPolling(data.ip);
-            return data.ip; // Return the updated IP
-          } else {
-            startRFIDPolling(ip);
-          }
-        }
-        
-        return ip; // Return the current IP if it's still valid
+      // Convert to base64
+      const base64Command = btoa(commandJson);
+      
+      await connectedDevice.writeCharacteristicWithResponseForService(
+        SERVICE_UUID,
+        CONTROL_CHAR_UUID,
+        base64Command
+      );
+      
+      console.log('Control command sent successfully');
+    } catch (error) {
+      console.error('Error sending control command:', error);
+      Alert.alert(
+        'Command Error',
+        `Failed to send command: ${error.message}`
+      );
+    }
+  };
+
+  // Test ESP32 communication
+  const testESP32Communication = async () => {
+    await sendControlCommand({ command: 'get_status' });
+  };
+
+  // Auto-connect to saved scanner
+  const autoConnectToSavedScanner = async () => {
+    try {
+      const savedDeviceId = await AsyncStorage.getItem('savedScannerDeviceId');
+      if (savedDeviceId && !scannerConnected && manager) {
+        console.log('Attempting auto-connect to:', savedDeviceId);
+        await connectToDevice(savedDeviceId);
       }
     } catch (error) {
-      console.error('Scanner status check error:', error);
-      setScannerConnected(false);
+      console.error('Auto-connect error:', error);
     }
-    return null;
   };
-  
-  // Start polling for RFID scans
-  const startRFIDPolling = (ip) => {
-    // Clear any existing interval
-    if (window.rfidPollingInterval) {
-      clearInterval(window.rfidPollingInterval);
-    }
-    
-    console.log('Starting RFID polling at IP:', ip);
-    
-    // Set up a new polling interval just to maintain connection
-    window.rfidPollingInterval = setInterval(async () => {
-      try {
-        const response = await fetch(`http://${ip}/read-rfid`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('RFID polling active - scanner responsive');
-          
-          // Just update last active time to show scanner is working
-          setLastActive('just now');
-        }
-      } catch (error) {
-        console.error('RFID polling error:', error);
-        
-        // If we get an error, check if the scanner is still available
-        const stillConnected = await checkScannerStatus(ip);
-        
-        if (!stillConnected) {
-          // Stop polling if scanner is not available
-          clearInterval(window.rfidPollingInterval);
-          setScannerConnected(false);
-        }
+
+  // Disconnect from scanner
+  const disconnectFromScanner = async () => {
+    try {
+      if (connectedDevice) {
+        await connectedDevice.cancelConnection();
+        setConnectedDevice(null);
+        setScannerConnected(false);
+        setLastActive('Disconnected');
+        await AsyncStorage.removeItem('savedScannerDeviceId');
       }
-    }, 3000); // Poll every 3 seconds just to maintain connection
+    } catch (error) {
+      console.error('Disconnect error:', error);
+    }
   };
-  
-  // Handle manual refresh
+
+  // Handle refresh
   const onRefresh = async () => {
     setRefreshing(true);
     if (hasAssignedScanner) {
-      await checkNetworkStatus();
+      if (!scannerConnected && manager) {
+        await scanForDevices();
+      }
     } else {
       await checkScannerAssignment();
     }
     setRefreshing(false);
   };
-  
-  // Clean up polling interval on unmount
-  useEffect(() => {
-    return () => {
-      if (window.rfidPollingInterval) {
-        clearInterval(window.rfidPollingInterval);
-      }
-    };
-  }, []);
 
-  // Navigate to dashboard
+  // Navigation functions
   const navigateToSettings = () => {
     navigation.navigate('Settings');
   };
   
-  // Navigate to create payment screen
   const navigateToCreatePayment = () => {
     if (!scannerConnected) {
       Alert.alert(
         'Scanner Not Connected',
-        'Please connect to the scanner first before creating payments.',
-        [{ text: 'OK', style: 'default' }]
+        'Please connect to the scanner first before creating payments.'
       );
       return;
     }
-    
-    console.log('Current rfidReaderIP state:', rfidReaderIP);
-    
-    // Navigate to payments (IP will be read from AsyncStorage)
     navigation.navigate('Payments');
-  };
-  
-  // Navigate to wifi setup screen
-  const navigateToWifiSetup = () => {
-    navigation.navigate('WifiSetup');
   };
 
   // Show loading screen while checking assignment
@@ -588,6 +787,58 @@ const ScannerScreen = () => {
           <Text style={{ marginTop: 20, fontSize: 16, color: '#666' }}>
             Checking scanner assignment...
           </Text>
+          <Text style={{ marginTop: 10, fontSize: 14, color: '#888', textAlign: 'center' }}>
+            Platform: {Platform.OS} {Platform.Version}
+          </Text>
+          {bleError && (
+            <Text style={{ marginTop: 10, fontSize: 12, color: '#e74c3c', textAlign: 'center' }}>
+              {bleError}
+            </Text>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show BLE unavailable screen
+  if (!bleAvailable || bleError) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+          <MaterialCommunityIcons name="bluetooth-off" size={64} color="#e74c3c" />
+          <Text style={{ marginTop: 20, fontSize: 18, fontWeight: 'bold', color: '#333', textAlign: 'center' }}>
+            BLE Not Available
+          </Text>
+          <Text style={{ marginTop: 10, fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 20 }}>
+            {bleError || 'Bluetooth Low Energy is not available on this device.'}
+          </Text>
+          
+          {bleError && bleError.includes('Development build required') && (
+            <View style={{ marginTop: 20, backgroundColor: '#fff3cd', padding: 15, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#ffc107' }}>
+              <Text style={{ fontSize: 14, color: '#856404', fontWeight: 'bold' }}>
+                Development Build Required
+              </Text>
+              <Text style={{ fontSize: 12, color: '#856404', marginTop: 5, lineHeight: 16 }}>
+                BLE functionality requires a development build. You cannot use Expo Go for Bluetooth features.
+                {'\n\n'}Build with: npx expo run:ios --device or npx expo run:android --device
+              </Text>
+            </View>
+          )}
+          
+          <TouchableOpacity 
+            style={{ 
+              backgroundColor: '#ed7b0e', 
+              paddingHorizontal: 20, 
+              paddingVertical: 12, 
+              borderRadius: 8, 
+              marginTop: 20 
+            }}
+            onPress={navigateToSettings}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>
+              Go to Settings
+            </Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -631,14 +882,31 @@ const ScannerScreen = () => {
           {/* Scanner Assignment Section */}
           <View style={styles.detailsSection}>
             <View style={[styles.sectionHeader, { flexDirection: 'row', alignItems: 'center' }]}>
-              <MaterialCommunityIcons name="credit-card-scan-outline" size={24} color="#ed7b0e" style={{ marginRight: 8 }} />
-              <Text style={styles.sectionTitle}>Assign RFID Scanner</Text>
+              <MaterialCommunityIcons name="bluetooth" size={24} color="#ed7b0e" style={{ marginRight: 8 }} />
+              <Text style={styles.sectionTitle}>Assign BLE RFID Scanner</Text>
             </View>
             
             <View style={styles.assignmentFormSection}>
               <Text style={[styles.detailValue, { marginBottom: 25, textAlign: 'center', color: '#666', fontSize: 15, lineHeight: 22 }]}>
-                You need to assign an RFID scanner to your account before you can start accepting payments.
+                You need to assign a Bluetooth RFID scanner to your account before you can start accepting payments.
               </Text>
+
+              {/* Platform info */}
+              <View style={{
+                backgroundColor: '#f8f9fa',
+                padding: 12,
+                borderRadius: 8,
+                marginBottom: 20,
+                borderLeftWidth: 3,
+                borderLeftColor: bleAvailable ? '#28a745' : '#dc3545'
+              }}>
+                <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
+                  Platform: {Platform.OS} {Platform.Version} | Device: {Device.isDevice ? 'Physical' : 'Simulator'}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#888', textAlign: 'center', marginTop: 4 }}>
+                  BLE: {bleAvailable ? 'Available' : 'Not Available'} | Bluetooth: {bluetoothState}
+                </Text>
+              </View>
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>
@@ -685,7 +953,7 @@ const ScannerScreen = () => {
                     activeOpacity={0.7}
                   >
                     <MaterialCommunityIcons 
-                      name="cellphone-nfc" 
+                      name="bluetooth" 
                       size={20} 
                       color={(showModelDropdown || modelFocused) ? "#ed7b0e" : "#666"} 
                       style={styles.inputIcon}
@@ -724,7 +992,7 @@ const ScannerScreen = () => {
                         activeOpacity={0.7}
                       >
                         <MaterialCommunityIcons 
-                          name="cellphone-nfc" 
+                          name="bluetooth" 
                           size={16} 
                           color={model === option.value ? "#ed7b0e" : "#666"} 
                           style={{ marginRight: 10 }}
@@ -798,12 +1066,17 @@ const ScannerScreen = () => {
             <View style={styles.helpHeader}>
               <Ionicons name="help-circle-outline" size={24} color="#ed7b0e" />
               <Text style={styles.helpTitle}>
-                How to find your scanner details?
+                Need help with BLE setup?
               </Text>
             </View>
             
             <Text style={styles.helpText}>
-              Your RFID scanner's Device ID and Model can usually be found on a label on the device itself or in the device manual. If you're unsure, contact your hardware provider for assistance.
+              <Text style={{ fontWeight: 'bold' }}>Step 1:</Text> Power on your ESP32 RFID scanner{'\n'}
+              <Text style={{ fontWeight: 'bold' }}>Step 2:</Text> Ensure Bluetooth is enabled on your phone{'\n'}
+              <Text style={{ fontWeight: 'bold' }}>Step 3:</Text> Grant Location and Nearby devices permissions{'\n'}
+              <Text style={{ fontWeight: 'bold' }}>Step 4:</Text> Enable Location services in phone Settings{'\n'}
+              <Text style={{ fontWeight: 'bold' }}>Step 5:</Text> Return to app and assign your scanner{'\n\n'}
+              <Text style={{ fontWeight: 'bold' }}>Need help?</Text> Make sure to enable all Bluetooth permissions in Settings : Apps : Tapyze Merchant : Permissions
             </Text>
             
             <TouchableOpacity style={{
@@ -823,7 +1096,7 @@ const ScannerScreen = () => {
                 color: '#FFFFFF',
                 fontWeight: '600',
               }}>
-                Contact Support
+                View BLE Setup Guide
               </Text>
             </TouchableOpacity>
           </View>
@@ -834,7 +1107,7 @@ const ScannerScreen = () => {
 
   // Show main scanner screen if scanner is assigned
   const scannerDetails = assignedScanner ? {
-    name: assignedScanner.model || 'RFID Card Reader',
+    name: assignedScanner.model || 'BLE RFID Card Reader',
     scannerId: assignedScanner.deviceId,
     firmwareVersion: assignedScanner.firmwareVersion,
     location: 'Main Counter'
@@ -842,7 +1115,7 @@ const ScannerScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header Section - Same as original ScannerScreen */}
+      {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <Image 
@@ -866,7 +1139,7 @@ const ScannerScreen = () => {
       {/* Greeting Section */}
       <View style={styles.greetingSection}>
         <Text style={styles.greeting}>Hello, Coffee Shop</Text>
-        <Text style={styles.greetingSubtext}>Manage your RFID scanner</Text>
+        <Text style={styles.greetingSubtext}>Manage your BLE RFID scanner</Text>
       </View>
       
       <ScrollView 
@@ -886,7 +1159,7 @@ const ScannerScreen = () => {
               <View style={styles.cardLogo}>
                 <Text style={styles.cardLogoText}>TAPYZE</Text>
               </View>
-              <Text style={styles.cardType}>NFC SCANNER</Text>
+              <Text style={styles.cardType}>BLE NFC SCANNER</Text>
             </View>
             
             <View style={styles.cardContent}>
@@ -899,7 +1172,7 @@ const ScannerScreen = () => {
                   scannerConnected ? styles.connectionActive : styles.connectionInactive
                 ]}>
                   <Ionicons 
-                    name={scannerConnected ? "radio-outline" : "radio-outline"} 
+                    name={scannerConnected ? "bluetooth" : "bluetooth-outline"} 
                     size={20} 
                     color="#FFFFFF" 
                   />
@@ -909,32 +1182,142 @@ const ScannerScreen = () => {
                     {scannerConnected ? 'Connected' : 'Disconnected'}
                   </Text>
                   <Text style={styles.connectionSubtext}>
-                    {scannerConnected ? 'Ready for payments' : 'Check connection below'}
+                    {scannerConnected ? 'Ready for payments' : bleAvailable ? 'Tap to scan for devices' : 'BLE not available'}
                   </Text>
                 </View>
               </View>
             </View>
             
-            {searching ? (
+            {scanning ? (
               <View style={styles.scanningContainer}>
                 <ActivityIndicator size="small" color="#ed7b0e" />
-                <Text style={styles.scanningText}>Searching for scanner...</Text>
+                <Text style={styles.scanningText}>
+                  Scanning for BLE devices on {Platform.OS}...
+                </Text>
               </View>
             ) : (
               <TouchableOpacity 
-                style={styles.checkConnectionButton}
-                onPress={findScannerOnNetwork}
-                disabled={searching}
+                style={[
+                  styles.checkConnectionButton,
+                  (!bleAvailable || bluetoothState !== 'PoweredOn') && { backgroundColor: '#cccccc' }
+                ]}
+                onPress={scannerConnected ? disconnectFromScanner : scanForDevices}
+                disabled={scanning || !bleAvailable || bluetoothState !== 'PoweredOn'}
               >
-                <Ionicons name="refresh-outline" size={20} color="#FFF" />
+                <Ionicons 
+                  name={scannerConnected ? "bluetooth" : "bluetooth-outline"} 
+                  size={20} 
+                  color="#FFF" 
+                />
                 <Text style={styles.checkConnectionText}>
-                  {scannerConnected ? 'Check Connection' : 'Find Scanner'}
+                  {scannerConnected ? 'Disconnect' : bleAvailable ? 'Scan for Devices' : 'BLE Unavailable'}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
         </View>
-        
+
+        {/* Bluetooth Status Info */}
+        <View style={styles.detailsSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Bluetooth Status</Text>
+          </View>
+          
+          <View style={styles.detailsContainer}>
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Platform</Text>
+              <Text style={styles.detailValue}>{Platform.OS} {Platform.Version}</Text>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Device Type</Text>
+              <Text style={styles.detailValue}>
+                {Device.isDevice ? 'Physical Device' : 'Simulator/Emulator'}
+              </Text>
+            </View>
+
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>BLE Available</Text>
+              <View style={styles.detailValueContainer}>
+                <View style={[
+                  styles.statusDot,
+                  bleAvailable ? styles.statusConnected : styles.statusDisconnected
+                ]} />
+                <Text style={[
+                  styles.detailValue,
+                  bleAvailable ? styles.valueConnected : styles.valueDisconnected
+                ]}>
+                  {bleAvailable ? 'Yes' : 'No'}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Bluetooth State</Text>
+              <View style={styles.detailValueContainer}>
+                <View style={[
+                  styles.statusDot,
+                  bluetoothState === 'PoweredOn' ? styles.statusConnected : styles.statusDisconnected
+                ]} />
+                <Text style={[
+                  styles.detailValue,
+                  bluetoothState === 'PoweredOn' ? styles.valueConnected : styles.valueDisconnected
+                ]}>
+                  {bluetoothState}
+                </Text>
+              </View>
+            </View>
+
+            {bleError && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Error</Text>
+                <Text style={[styles.detailValue, { color: '#e74c3c', fontSize: 12 }]}>
+                  {bleError}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Discovered Devices */}
+        {discoveredDevices.length > 0 && !scannerConnected && (
+          <View style={styles.detailsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Discovered Devices ({discoveredDevices.length})</Text>
+            </View>
+            
+            <View style={styles.detailsContainer}>
+              {discoveredDevices.map((device, index) => (
+                <TouchableOpacity
+                  key={device.id}
+                  style={[styles.deviceItem, {
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: 8,
+                    padding: 15,
+                    marginBottom: 10,
+                    borderWidth: 1,
+                    borderColor: '#e9ecef',
+                  }]}
+                  onPress={() => connectToDevice(device.id)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <MaterialCommunityIcons name="bluetooth" size={24} color="#ed7b0e" />
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: '#333' }}>
+                        {device.name}
+                      </Text>
+                      <Text style={{ fontSize: 14, color: '#666', marginTop: 2 }}>
+                        Signal: {device.rssi} dBm
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#ed7b0e" />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Scanner Details */}
         <View style={styles.detailsSection}>
           <View style={styles.sectionHeader}>
@@ -943,7 +1326,7 @@ const ScannerScreen = () => {
           
           <View style={styles.detailsContainer}>
             <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Status</Text>
+              <Text style={styles.detailLabel}>Connection Status</Text>
               <View style={styles.detailValueContainer}>
                 <View style={[
                   styles.statusDot,
@@ -979,15 +1362,6 @@ const ScannerScreen = () => {
               </View>
             )}
             
-            {networkInfo && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Network</Text>
-                <Text style={styles.detailValue}>
-                  {networkInfo?.details?.ssid || 'Unknown'}
-                </Text>
-              </View>
-            )}
-            
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Last Active</Text>
               <Text style={styles.detailValue}>{lastActive}</Text>
@@ -1003,18 +1377,45 @@ const ScannerScreen = () => {
               <Text style={styles.detailValue}>{scannerDetails.location}</Text>
             </View>
             
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>IP Address</Text>
-              <Text style={styles.detailValue}>{rfidReaderIP || 'Unknown'}</Text>
-            </View>
+            {connectedDevice && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Device ID</Text>
+                <Text style={[styles.detailValue, { fontSize: 12, fontFamily: 'monospace' }]}>
+                  {connectedDevice.id}
+                </Text>
+              </View>
+            )}
+
+            {lastRfidData && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Last Scanned Card</Text>
+                <Text style={[styles.detailValue, { fontFamily: 'monospace', fontSize: 14 }]}>
+                  {lastRfidData.uid}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+                  {new Date(lastRfidData.timestamp).toLocaleString()}
+                </Text>
+              </View>
+            )}
+
+            {scannerStatus && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Scanner Uptime</Text>
+                <Text style={styles.detailValue}>
+                  {Math.floor(scannerStatus.uptime / 1000 / 60)} minutes
+                </Text>
+              </View>
+            )}
           </View>
         </View>
-
 
         {/* Accept Payment - Action Button */}
         <View style={styles.paymentActionContainer}>
           <TouchableOpacity 
-            style={[styles.paymentActionButton, {backgroundColor: scannerConnected ? '#ed7b0e' : '#cccccc'}]}
+            style={[
+              styles.paymentActionButton, 
+              {backgroundColor: scannerConnected ? '#ed7b0e' : '#cccccc'}
+            ]}
             onPress={navigateToCreatePayment}
             disabled={!scannerConnected}
           >
@@ -1024,49 +1425,74 @@ const ScannerScreen = () => {
             <Text style={styles.paymentActionTitle}>Accept Payment</Text>
           </TouchableOpacity>
         </View>
-        
-        {/* Manual IP Button */}
+
+        {/* Action Buttons */}
         <View style={styles.manualIpButtonContainer}>
+          {/* Test ESP32 Communication */}
+          {scannerConnected && (
+            <TouchableOpacity
+              style={[styles.manualIpButton, { marginBottom: 10, backgroundColor: '#17a2b8' }]}
+              onPress={testESP32Communication}
+            >
+              <Text style={styles.manualIpButtonText}>
+                Test ESP32 Communication
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Clear RFID Button */}
+          {scannerConnected && lastRfidData && (
+            <TouchableOpacity
+              style={[styles.manualIpButton, { marginBottom: 10 }]}
+              onPress={() => {
+                setLastRfidData(null);
+                AsyncStorage.removeItem('lastRfidScan');
+              }}
+            >
+              <Text style={styles.manualIpButtonText}>
+                Clear Last RFID Scan
+              </Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Open Bluetooth Settings */}
           <TouchableOpacity
             style={styles.manualIpButton}
-            onPress={showManualIPPrompt}
+            onPress={() => Linking.openSettings()}
           >
             <Text style={styles.manualIpButtonText}>
-              Enter Scanner IP Manually
+              Open {Platform.OS === 'ios' ? 'Settings' : 'Bluetooth Settings'}
             </Text>
           </TouchableOpacity>
         </View>
-        
+
         {/* Help Section */}
         <View style={styles.helpSection}>
           <View style={styles.helpHeader}>
             <Ionicons name="help-circle-outline" size={24} color="#ed7b0e" />
             <Text style={styles.helpTitle}>
-              Need help with your scanner?
+              How to connect your BLE scanner
             </Text>
           </View>
           
           <Text style={styles.helpText}>
-            If you're having trouble with your RFID scanner, check that it's powered on and connected to the same WiFi network as your phone. You can also try manually entering the scanner's IP address.
+            <Text style={{ fontWeight: 'bold' }}>Step 1:</Text> Power on your ESP32 RFID scanner{'\n'}
+            <Text style={{ fontWeight: 'bold' }}>Step 2:</Text> Ensure Bluetooth is enabled on your phone{'\n'}
+            <Text style={{ fontWeight: 'bold' }}>Step 3:</Text> Tap "Scan for Devices" below{'\n'}
+            <Text style={{ fontWeight: 'bold' }}>Step 4:</Text> Select "TapyzeScanner" from the list{'\n'}
+            <Text style={{ fontWeight: 'bold' }}>Step 5:</Text> Wait for connection confirmation{'\n'}
+            <Text style={{ fontWeight: 'bold' }}>Step 6:</Text> Test by scanning an RFID card{'\n\n'}
+            <Text style={{ fontWeight: 'bold' }}>Troubleshooting:</Text>{'\n'}
+            • Grant Location and Nearby devices permissions{'\n'}
+            • Enable Location services in Settings{'\n'}
+            • Keep scanner within 10 meters{'\n'}
+            • Restart app if connection fails
           </Text>
           
           <TouchableOpacity style={styles.helpButton}>
             <Text style={styles.helpButtonText}>
-              View Troubleshooting Guide
+              View {Platform.OS === 'ios' ? 'iOS' : 'Android'} Setup Guide
             </Text>
-          </TouchableOpacity>
-        </View>
-        
-        {/* WiFi Setup Button */}
-        <View style={styles.wifiActionContainer}>
-          <TouchableOpacity 
-            style={styles.wifiActionButton}
-            onPress={navigateToWifiSetup}
-          >
-            <View style={styles.wifiActionIcon}>
-              <Ionicons name="wifi-outline" size={28} color="#FFFFFF" />
-            </View>
-            <Text style={styles.wifiActionTitle}>Connect Scanner to Wifi</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
