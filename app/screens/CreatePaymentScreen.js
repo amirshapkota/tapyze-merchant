@@ -478,8 +478,9 @@ const CreatePaymentScreen = () => {
         console.log('Payment successful');
         
         setTransactionId(result.data.transactionReference || `TXN${Date.now()}`);
+        
+        // Store merchant balance info only (remove customer balance)
         setCustomerInfo({
-          newBalance: result.data.customerBalance,
           merchantBalance: result.data.merchantBalance
         });
         
@@ -918,13 +919,6 @@ const CreatePaymentScreen = () => {
                   {scannedCard?.uid ? `${scannedCard.uid.substring(0, 12)}...` : 'N/A'}
                 </Text>
               </View>
-              
-              {customerInfo && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Customer Balance</Text>
-                  <Text style={styles.detailValue}>{CURRENCY} {customerInfo.newBalance?.toFixed(2)}</Text>
-                </View>
-              )}
               
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Status</Text>
