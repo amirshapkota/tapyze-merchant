@@ -48,7 +48,7 @@ const merchantPromotions = [
 
 const DashboardScreen = () => {
   const navigation = useNavigation();
-  const { user } = useMerchantAuth();
+  const { user, isAuthenticated, token } = useMerchantAuth();
   
   // State management
   const [isLoading, setIsLoading] = useState(true);
@@ -66,14 +66,23 @@ const DashboardScreen = () => {
 
   // Load dashboard data
   const loadDashboardData = async (showLoader = true) => {
+    // Add authentication check
+    if (!isAuthenticated || !token) {
+      console.log('Dashboard: Not authenticated, skipping data load');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (showLoader) setIsLoading(true);
       setError(null);
       
+      console.log('Dashboard: Loading data with authentication');
       const result = await merchantWalletService.getDashboardStats();
       
       if (result.success) {
         setDashboardData(result.data);
+        console.log('Dashboard: Data loaded successfully');
       } else {
         setError(result.message);
         Alert.alert('Error', result.message);
@@ -88,20 +97,37 @@ const DashboardScreen = () => {
     }
   };
 
-  // Load data when component mounts and when screen comes into focus
+  // Load data when component mounts and when authentication changes
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    console.log('Dashboard: Auth state changed - authenticated:', isAuthenticated, 'token exists:', !!token);
+    
+    if (isAuthenticated && token) {
+      console.log('Dashboard: Starting data load...');
+      loadDashboardData();
+    } else {
+      console.log('Dashboard: Not ready to load data');
+      setIsLoading(false);
+      setDashboardData(null);
+      setError(null);
+    }
+  }, [isAuthenticated, token]);
 
   useFocusEffect(
     useCallback(() => {
-      // Refresh data when screen comes into focus
-      loadDashboardData(false);
-    }, [])
+      // Only refresh data when screen comes into focus if authenticated
+      if (isAuthenticated && token) {
+        console.log('Dashboard: Screen focused, refreshing data');
+        loadDashboardData(false);
+      }
+    }, [isAuthenticated, token])
   );
 
   // Pull to refresh
   const onRefresh = () => {
+    if (!isAuthenticated || !token) {
+      setIsRefreshing(false);
+      return;
+    }
     setIsRefreshing(true);
     loadDashboardData(false);
   };
@@ -210,6 +236,16 @@ const DashboardScreen = () => {
       </TouchableOpacity>
     );
   };
+
+  // Show loading screen if not authenticated yet
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#ed7b0e" />
+        <Text style={styles.loadingText}>Checking authentication...</Text>
+      </SafeAreaView>
+    );
+  }
 
   // Show loading screen
   if (isLoading) {
