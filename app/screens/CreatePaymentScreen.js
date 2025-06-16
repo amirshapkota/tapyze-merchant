@@ -14,11 +14,19 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Device from 'expo-device';
 
 // Import services
 import paymentService from '../services/merchantPaymentService';
 
 import styles from '../styles/CreatePaymentScreenStyles';
+
+// BLE Service and Characteristic UUIDs (must match ESP32)
+const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
+const RFID_CHAR_UUID = '12345678-1234-1234-1234-123456789abd';
+const STATUS_CHAR_UUID = '12345678-1234-1234-1234-123456789abe';
+const CONFIG_CHAR_UUID = '12345678-1234-1234-1234-123456789abf';
+const CONTROL_CHAR_UUID = '12345678-1234-1234-1234-123456789ac0';
 
 const CreatePaymentScreen = () => {
   const navigation = useNavigation();
@@ -26,8 +34,9 @@ const CreatePaymentScreen = () => {
   const nfcAnimation = useRef(new Animated.Value(1)).current;
   const scaleAnimation = useRef(new Animated.Value(0.95)).current;
   
+  // Payment states
   const [amount, setAmount] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState('initial'); // 'initial', 'ready', 'enterPin', 'processing', 'success', 'failed'
+  const [paymentStatus, setPaymentStatus] = useState('initial');
   const [errorMessage, setErrorMessage] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [processingTimeout, setProcessingTimeout] = useState(null);
@@ -39,43 +48,64 @@ const CreatePaymentScreen = () => {
   const [customerInfo, setCustomerInfo] = useState(null);
   const [pinAttempts, setPinAttempts] = useState(0);
   const [maxAttempts, setMaxAttempts] = useState(3);
-  const [currentScannerIP, setCurrentScannerIP] = useState('192.168.4.1');
+
+  // BLE states
+  const [manager, setManager] = useState(null);
+  const [connectedDevice, setConnectedDevice] = useState(null);
 
   // Get constants from service
   const CURRENCY = paymentService.getCurrency();
   const MIN_AMOUNT = paymentService.getMinAmount();
   const PIN_LENGTH = paymentService.getPinLength();
 
-  // Load scanner IP from AsyncStorage
+  // Initialize BLE and check for existing connection
   useEffect(() => {
-    const loadScannerIP = async () => {
+    const initializeBLE = async () => {
       try {
-        const storedIP = await AsyncStorage.getItem('scannerIP');
-        if (storedIP) {
-          console.log('Payment screen loaded scanner IP from storage:', storedIP);
-          setCurrentScannerIP(storedIP);
+        if (!Device.isDevice) {
+          setErrorMessage('Physical device required for BLE functionality');
+          return;
+        }
+
+        const { BleManager } = await import('react-native-ble-plx');
+        if (!BleManager) {
+          setErrorMessage('BLE Manager not available - development build required');
+          return;
+        }
+
+        const bleManager = new BleManager();
+        setManager(bleManager);
+
+        const savedDeviceId = await AsyncStorage.getItem('savedScannerDeviceId');
+        if (savedDeviceId) {
+          try {
+            const device = await bleManager.connectToDevice(savedDeviceId);
+            await device.discoverAllServicesAndCharacteristics();
+            setConnectedDevice(device);
+            console.log('Connected to saved BLE device for payments');
+          } catch (error) {
+            console.error('Failed to connect to saved device:', error);
+            setErrorMessage('Scanner not connected. Please go back and connect scanner first.');
+          }
         } else {
-          console.log('No scanner IP found in storage, using default');
-          setCurrentScannerIP('192.168.4.1');
+          setErrorMessage('No scanner connected. Please connect scanner first.');
         }
       } catch (error) {
-        console.error('Failed to load scanner IP from AsyncStorage:', error);
-        setCurrentScannerIP('192.168.4.1');
+        console.error('BLE initialization error:', error);
+        setErrorMessage('BLE not available - development build required');
       }
     };
-    
-    loadScannerIP();
+
+    initializeBLE();
   }, []);
   
   useEffect(() => {
-    // Animate card scaling on mount
     Animated.timing(scaleAnimation, {
       toValue: 1,
       duration: 300,
       useNativeDriver: true
     }).start();
     
-    // Clean up any timeouts on unmount
     return () => {
       if (processingTimeout) {
         clearTimeout(processingTimeout);
@@ -87,13 +117,11 @@ const CreatePaymentScreen = () => {
   }, []);
   
   const handleGoBack = () => {
-    // Stop RFID polling when leaving screen
     if (rfidPollingInterval) {
       clearInterval(rfidPollingInterval);
       setRfidPollingInterval(null);
     }
 
-    // Prevent immediate navigation if a transaction is in progress
     if (paymentStatus === 'processing') {
       Alert.alert(
         "Cancel Transaction?",
@@ -149,17 +177,13 @@ const CreatePaymentScreen = () => {
     navigation.goBack();
   };
   
-  // Amount handlers
   const handleNumberPress = (number) => {
-    // If in PIN entry mode, handle PIN input
     if (paymentStatus === 'enterPin') {
-      // Strict PIN length validation - prevent any input beyond PIN_LENGTH
       if (pin.length >= PIN_LENGTH) {
         console.log('PIN already at maximum length, ignoring input');
         return;
       }
       
-      // Only allow numeric input for PIN
       if (!/^\d$/.test(number)) {
         console.log('Non-numeric input for PIN, ignoring:', number);
         return;
@@ -173,13 +197,12 @@ const CreatePaymentScreen = () => {
       return;
     }
     
-    // Handle amount input
     if (amount.includes('.') && amount.split('.')[1].length >= 2) {
       return;
     }
     
     if (!amount.includes('.') && amount.length >= 6) {
-      return; // Limit to 999,999
+      return;
     }
     
     if (amount === '0' && number !== '.') {
@@ -235,35 +258,25 @@ const CreatePaymentScreen = () => {
   };
   
   const handleNextPress = () => {
-    // Amount validation
     if (!amount || parseFloat(amount) <= MIN_AMOUNT) {
       setErrorMessage('Please enter a valid amount');
       return;
     }
     
-    // Scanner IP validation
-    if (!currentScannerIP) {
-      setErrorMessage('Scanner IP not available. Please go back and reconnect scanner.');
+    if (!connectedDevice) {
+      setErrorMessage('Scanner not connected. Please go back and connect scanner first.');
       return;
     }
     
-    console.log('Payment setup - Amount:', amount, 'Scanner IP:', currentScannerIP);
+    console.log('Payment setup - Amount:', amount, 'BLE Device connected');
     
-    // Clear any error messages
     setErrorMessage('');
-    
-    // Transition to ready state
     setPaymentStatus('ready');
-    
-    // Start the NFC reader animation
     startNfcAnimation();
-    
-    // Start RFID polling
     startRFIDPolling();
   };
   
   const startNfcAnimation = () => {
-    // Create pulsing effect for NFC reader
     Animated.loop(
       Animated.sequence([
         Animated.timing(nfcAnimation, {
@@ -280,82 +293,108 @@ const CreatePaymentScreen = () => {
     ).start();
   };
 
-  // Start RFID polling for card detection
   const startRFIDPolling = () => {
-    console.log('Starting RFID polling for payment at IP:', currentScannerIP);
+    console.log('Starting BLE RFID polling for payment...');
     
-    // First test the scanner connection
-    fetch(`http://${currentScannerIP}/status`, { timeout: 3000 })
-      .then(response => response.json())
-      .then(data => {
-        console.log('Scanner status check successful:', data);
-      })
-      .catch(error => {
-        console.error('Scanner status check failed:', error);
-        setErrorMessage('Cannot connect to scanner. Please check scanner connection.');
-        setPaymentStatus('failed');
-        return;
-      });
+    if (!connectedDevice) {
+      setErrorMessage('Cannot connect to scanner. Please check scanner connection.');
+      setPaymentStatus('failed');
+      return;
+    }
     
     let lastProcessedUID = "";
     let lastReceivedTimestamp = 0;
+    let rfidBuffer = '';
     
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch(`http://${currentScannerIP}/read-rfid`, {
-          method: 'GET',
-          timeout: 3000
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
+    try {
+      connectedDevice.monitorCharacteristicForService(
+        SERVICE_UUID,
+        RFID_CHAR_UUID,
+        (error, characteristic) => {
+          if (error) {
+            console.error('RFID monitoring error:', error);
+            if (error.errorCode === 6) {
+              setErrorMessage('Scanner connection lost. Please check the scanner and try again.');
+              setPaymentStatus('failed');
+            }
+            return;
+          }
           
-          // Only process if we have a valid UID and it's new
-          if (data.uid && data.uid.length > 0) {
-            const isNewUID = data.uid !== lastProcessedUID;
-            const isNewTimestamp = data.timestamp !== lastReceivedTimestamp && data.timestamp > 0;
-            
-            if (isNewUID || isNewTimestamp) {
-              console.log('RFID card detected for payment:', data.uid, 'Timestamp:', data.timestamp);
+          if (characteristic?.value) {
+            try {
+              const rawData = atob(characteristic.value);
+              console.log('Raw RFID data received:', rawData);
               
-              // Update our tracking variables
-              lastProcessedUID = data.uid;
-              lastReceivedTimestamp = data.timestamp;
+              if (!rawData || rawData.trim() === '') {
+                console.log('Empty RFID data received, skipping...');
+                return;
+              }
               
-              // Stop polling once card is detected
-              clearInterval(interval);
-              setRfidPollingInterval(null);
-              
-              // Handle card detection
-              await handleCardDetected(data.uid);
-            } else {
-              console.log('Ignoring old card data:', data.uid, 'Timestamp:', data.timestamp);
+              try {
+                const data = JSON.parse(rawData);
+                console.log('Parsed RFID data:', data);
+                
+                if (data.uid && data.uid.length > 0) {
+                  const isNewUID = data.uid !== lastProcessedUID;
+                  const isNewTimestamp = data.timestamp !== lastReceivedTimestamp && data.timestamp > 0;
+                  
+                  if (isNewUID || isNewTimestamp) {
+                    console.log('RFID card detected for payment:', data.uid, 'Timestamp:', data.timestamp);
+                    
+                    lastProcessedUID = data.uid;
+                    lastReceivedTimestamp = data.timestamp;
+                    
+                    handleCardDetected(data.uid);
+                  } else {
+                    console.log('Ignoring old card data:', data.uid, 'Timestamp:', data.timestamp);
+                  }
+                }
+                rfidBuffer = '';
+              } catch (parseError) {
+                rfidBuffer += rawData;
+                console.log('Buffering RFID data, current buffer:', rfidBuffer);
+                
+                try {
+                  const data = JSON.parse(rfidBuffer);
+                  console.log('Parsed buffered RFID data:', data);
+                  
+                  if (data.uid && data.uid.length > 0) {
+                    const isNewUID = data.uid !== lastProcessedUID;
+                    const isNewTimestamp = data.timestamp !== lastReceivedTimestamp && data.timestamp > 0;
+                    
+                    if (isNewUID || isNewTimestamp) {
+                      console.log('RFID card detected for payment (buffered):', data.uid, 'Timestamp:', data.timestamp);
+                      
+                      lastProcessedUID = data.uid;
+                      lastReceivedTimestamp = data.timestamp;
+                      
+                      handleCardDetected(data.uid);
+                    }
+                  }
+                  rfidBuffer = '';
+                } catch (bufferError) {
+                  console.log('Buffer still incomplete, waiting for more data...');
+                }
+              }
+            } catch (error) {
+              console.error('Error processing RFID data:', error);
+              rfidBuffer = '';
             }
           }
-        } else {
-          console.log('RFID polling response not ok:', response.status);
         }
-      } catch (error) {
-        console.error('RFID polling error:', error.message);
-        
-        // If we can't reach the scanner, show error
-        if (error.message.includes('Network request failed') || error.message.includes('timeout')) {
-          console.log('Scanner connection lost, stopping polling');
-          clearInterval(interval);
-          setRfidPollingInterval(null);
-          setErrorMessage('Scanner connection lost. Please check the scanner and try again.');
-          setPaymentStatus('failed');
-        }
-      }
-    }, 1000); // Poll every second
+      );
+      
+      setRfidPollingInterval(true);
+      
+    } catch (error) {
+      console.error('Error starting BLE RFID monitoring:', error);
+      setErrorMessage('Failed to start card monitoring. Please try again.');
+      setPaymentStatus('failed');
+    }
     
-    setRfidPollingInterval(interval);
-    
-    // Add timeout to stop polling after 60 seconds
     setTimeout(() => {
-      if (interval) {
-        console.log('RFID polling timeout - stopping');
-        clearInterval(interval);
+      if (rfidPollingInterval) {
+        console.log('BLE RFID polling timeout - stopping');
         setRfidPollingInterval(null);
         if (paymentStatus === 'ready') {
           setErrorMessage('No card detected within 60 seconds. Please try again.');
@@ -365,29 +404,24 @@ const CreatePaymentScreen = () => {
     }, 60000);
   };
   
-  // Handle real card detection from RFID using PaymentService
   const handleCardDetected = async (cardUid) => {
     try {
       console.log('Processing detected card:', cardUid);
       
-      // Stop NFC animation
       nfcAnimation.stopAnimation();
+      setRfidPollingInterval(null);
       
-      // Verify card using PaymentService
       const result = await paymentService.verifyCard(cardUid);
       
       if (result.success) {
-        // Store card info
         setScannedCard(result.data);
         
-        // Check if card requires PIN change
         if (result.data.requiresPinChange) {
           setErrorMessage('PIN change required before making transactions');
           setPaymentStatus('failed');
           return;
         }
         
-        // Check card status
         if (result.data.cardStatus === 'PIN_LOCKED') {
           setErrorMessage('Card is locked due to multiple failed PIN attempts');
           setPaymentStatus('failed');
@@ -400,14 +434,12 @@ const CreatePaymentScreen = () => {
           return;
         }
         
-        // Transition to PIN entry state
         setPaymentStatus('enterPin');
         setPin('');
         setPinError('');
         setPinAttempts(0);
         
       } else {
-        // Card verification failed
         setErrorMessage(result.message || 'Invalid card detected');
         setPaymentStatus('failed');
       }
@@ -418,14 +450,12 @@ const CreatePaymentScreen = () => {
     }
   };
   
-  // Handle PIN submission using PaymentService
   const handlePinSubmit = async () => {
     console.log('=== PIN SUBMISSION ===');
     console.log('Current PIN:', pin);
     console.log('PIN Length:', pin.length);
     console.log('Expected Length:', PIN_LENGTH);
     
-    // Validate PIN length
     if (pin.length !== PIN_LENGTH) {
       const errorMsg = `Please enter ${PIN_LENGTH} digit PIN`;
       console.log('PIN length validation failed:', errorMsg);
@@ -433,7 +463,6 @@ const CreatePaymentScreen = () => {
       return;
     }
     
-    // Validate PIN contains only digits
     if (!/^\d+$/.test(pin)) {
       const errorMsg = 'PIN must contain only numbers';
       console.log('PIN format validation failed:', errorMsg);
@@ -441,7 +470,6 @@ const CreatePaymentScreen = () => {
       return;
     }
     
-    // Validate scanned card exists
     if (!scannedCard || !scannedCard.uid) {
       const errorMsg = 'No card detected. Please try again.';
       console.log('Card validation failed:', errorMsg);
@@ -451,14 +479,10 @@ const CreatePaymentScreen = () => {
     
     console.log('PIN validation passed, processing payment...');
     
-    // Clear any previous errors
     setPinError('');
-    
-    // Process payment
     await processPayment();
   };
   
-  // Process payment using PaymentService
   const processPayment = async () => {
     try {
       setPaymentStatus('processing');
@@ -474,43 +498,85 @@ const CreatePaymentScreen = () => {
       
       const result = await paymentService.processPayment(paymentData);
       
+      console.log('PaymentService result:', result);
+      console.log('Result success:', result.success);
+      console.log('Result type:', result.type);
+      console.log('Result message:', result.message);
+      
       if (result.success) {
         console.log('Payment successful');
         
         setTransactionId(result.data.transactionReference || `TXN${Date.now()}`);
         
-        // Store merchant balance info only (remove customer balance)
         setCustomerInfo({
           merchantBalance: result.data.merchantBalance
         });
         
         setPaymentStatus('success');
       } else {
-        console.log('Payment failed:', result.message);
-        handlePaymentFailure(result);
+        console.log('Payment failed - checking type...');
+        
+        // Check for Invalid PIN in multiple ways
+        const isInvalidPin = result.type === 'INVALID_PIN' || 
+                           result.type === 'UNKNOWN_ERROR' && result.message && result.message.toLowerCase().includes('invalid pin');
+        
+        console.log('Is invalid PIN?', isInvalidPin);
+        
+        if (isInvalidPin) {
+          console.log('✅ Invalid PIN detected - staying on PIN entry page');
+          if (result.data && result.data.remainingAttempts !== undefined) {
+            setPinAttempts(3 - result.data.remainingAttempts);
+            setMaxAttempts(3);
+            setPinError(result.message);
+          } else {
+            setPinError('Invalid PIN. Please try again.');
+          }
+          setPin(''); // Clear PIN for retry
+          setPaymentStatus('enterPin'); // Explicitly set back to enterPin
+          console.log('Status set back to enterPin, PIN cleared');
+        } else {
+          console.log('Other error type - going to failed state');
+          // For all other failures, use the general failure handler
+          handlePaymentFailure(result);
+        }
       }
       
     } catch (error) {
-      console.error('Payment processing error:', error);
-      setErrorMessage('An unexpected error occurred. Please try again.');
-      setPaymentStatus('failed');
+      console.error('Payment processing error in catch block:', error);
+      console.log('Error message:', error.message);
+      console.log('Checking if error contains "invalid pin"...');
+      
+      // Check if the error is specifically about invalid PIN
+      if (error.message && error.message.toLowerCase().includes('invalid pin')) {
+        console.log('✅ Caught invalid PIN error - staying on PIN entry page');
+        console.log('Setting PIN error and clearing PIN field');
+        setPinError('Invalid PIN. Please try again.');
+        setPin(''); // Clear PIN for retry
+        setPaymentStatus('enterPin'); // Stay on PIN entry page
+        console.log('Status set back to enterPin');
+      } else {
+        console.log('❌ Other error detected - going to failed state');
+        // For other errors, go to failed state
+        setErrorMessage('An unexpected error occurred. Please try again.');
+        setPaymentStatus('failed');
+      }
     }
   };
   
-  // Handle payment failures
   const handlePaymentFailure = (result) => {
     switch (result.type) {
       case 'INVALID_PIN':
+        // Stay on PIN entry page for invalid PIN - don't go to failed state
         if (result.data && result.data.remainingAttempts !== undefined) {
           setPinAttempts(3 - result.data.remainingAttempts);
           setMaxAttempts(3);
           setPinError(result.message);
-          setPaymentStatus('enterPin');
-          setPin('');
+          setPin(''); // Clear PIN for retry
+          // Keep paymentStatus as 'enterPin' - don't change to 'failed'
         } else {
           setPinError('Invalid PIN. Please try again.');
-          setPaymentStatus('enterPin');
-          setPin('');
+          setPin(''); // Clear PIN for retry
+          // Keep paymentStatus as 'enterPin' - don't change to 'failed'
         }
         break;
         
@@ -537,23 +603,18 @@ const CreatePaymentScreen = () => {
   };
   
   const resetPayment = () => {
-    // Stop animations
     nfcAnimation.stopAnimation();
     nfcAnimation.setValue(1);
     
-    // Stop RFID polling
     if (rfidPollingInterval) {
-      clearInterval(rfidPollingInterval);
       setRfidPollingInterval(null);
     }
     
-    // Clear timeout if exists
     if (processingTimeout) {
       clearTimeout(processingTimeout);
       setProcessingTimeout(null);
     }
     
-    // Reset state
     setPaymentStatus('initial');
     setAmount('');
     setErrorMessage('');
@@ -625,15 +686,13 @@ const CreatePaymentScreen = () => {
       { value: '.' }, { value: '0' }, { value: 'del', icon: 'backspace-outline' }
     ];
     
-    // For PIN entry, disable decimal point and limit input
     if (paymentStatus === 'enterPin') {
-      keys[9] = { value: '', disabled: true }; // Disable decimal point
+      keys[9] = { value: '', disabled: true };
     }
     
     return (
       <View style={styles.numberPad}>
         {keys.map((key, index) => {
-          // Additional validation for PIN mode
           const isPinMode = paymentStatus === 'enterPin';
           const isPinFull = isPinMode && pin.length >= PIN_LENGTH && key.value !== 'del' && key.value !== '';
           const isDisabled = key.disabled || isPinFull;
@@ -671,7 +730,6 @@ const CreatePaymentScreen = () => {
     );
   };
   
-  // Render different content based on payment status
   const renderPaymentContent = () => {
     switch(paymentStatus) {
       case 'initial':
@@ -793,10 +851,12 @@ const CreatePaymentScreen = () => {
                 UID: {scannedCard?.uid ? `${scannedCard.uid.substring(0, 8)}...` : 'Unknown'}
               </Text>
             </View>
+
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>Enter PIN</Text>
               <Text style={styles.cardSubtitle}>Please enter your 4-digit PIN to complete payment</Text>
             </View>
+
             <View style={styles.amountSummary}>
               <Text style={styles.amountLabel}>Amount to Pay:</Text>
               <Text style={styles.summaryAmount}>{CURRENCY} {formatAmount(amount)}</Text>
@@ -828,6 +888,7 @@ const CreatePaymentScreen = () => {
                 <Text style={styles.buttonText}>Confirm</Text>
               </TouchableOpacity>
             </View>
+
             <TouchableOpacity
               style={styles.cancelButton}
               activeOpacity={0.8}
@@ -1023,25 +1084,23 @@ const CreatePaymentScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
-      {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
-            <Image 
+          <Image 
             source={require('../assets/logo.png')} 
             style={styles.logoImage}
             resizeMode="contain"
-            />
-            <View>
+          />
+          <View>
             <Text style={styles.brandName}>TAPYZE</Text>
             <Text style={styles.merchantLabel}>MERCHANT</Text>
-            </View>
+          </View>
         </View>
         <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
-            <Ionicons name="chevron-back" size={28} color="#000000" />
+          <Ionicons name="chevron-back" size={28} color="#000000" />
         </TouchableOpacity>
       </View>
 
-      {/* Title Section */}
       <View style={styles.titleSection}>
         <Text style={styles.screenTitle}>Accept Payment</Text>
         <Text style={styles.screenSubtitle}>
@@ -1054,7 +1113,6 @@ const CreatePaymentScreen = () => {
         </Text>
       </View>
       
-      {/* Main Content */}
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
