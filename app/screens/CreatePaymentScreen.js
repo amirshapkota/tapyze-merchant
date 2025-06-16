@@ -136,17 +136,21 @@ const CreatePaymentScreen = () => {
       }
       
       if (rfidPollingInterval) {
+        if (typeof rfidPollingInterval === 'object' && rfidPollingInterval.remove) {
+          rfidPollingInterval.remove();
+        }
         setRfidPollingInterval(null);
       }
-      
-      // Don't disconnect device - keep it for other screens
-      // The BLE connection should persist across screens
     };
   }, []);
   
   const handleGoBack = () => {
+    // Stop RFID monitoring when leaving screen
     if (rfidPollingInterval) {
-      clearInterval(rfidPollingInterval);
+      console.log('Stopping RFID monitoring on back navigation');
+      if (typeof rfidPollingInterval === 'object' && rfidPollingInterval.remove) {
+        rfidPollingInterval.remove();
+      }
       setRfidPollingInterval(null);
     }
 
@@ -321,8 +325,9 @@ const CreatePaymentScreen = () => {
     ).start();
   };
 
+  // CLEAN RFID Monitoring - No buffering, production ready
   const startRFIDPolling = () => {
-    console.log('Starting BLE RFID polling for payment...');
+    console.log('Starting BLE RFID monitoring for payment...');
     
     if (!connectedDevice) {
       setErrorMessage('Cannot connect to scanner. Please check scanner connection.');
@@ -330,131 +335,89 @@ const CreatePaymentScreen = () => {
       return;
     }
     
-    let lastProcessedUID = "";
-    let lastReceivedTimestamp = 0;
-    let rfidBuffer = '';
+    let lastUID = "";
+    let lastTime = 0;
+    let subscription = null;
+    
+    const handleRFIDData = (error, characteristic) => {
+      if (error) {
+        console.error('RFID monitoring error:', error);
+        if (error.errorCode === 6) {
+          setErrorMessage('Scanner connection lost. Please check the scanner and try again.');
+          setPaymentStatus('failed');
+        }
+        return;
+      }
+      
+      if (!characteristic?.value) return;
+      
+      try {
+        const rawData = atob(characteristic.value);
+        console.log('Raw RFID data received:', rawData);
+        
+        if (!rawData || rawData.trim() === '') return;
+        
+        const data = JSON.parse(rawData);
+        console.log('Parsed RFID data:', data);
+        
+        // Only process RFID scan data (not status data)
+        if (data.uid && data.uid.length > 0 && !data.status) {
+          const now = Date.now();
+          const timeDiff = now - lastTime;
+          const isNewCard = data.uid !== lastUID || timeDiff > 2000;
+          
+          if (isNewCard) {
+            console.log('Card detected for payment:', data.uid);
+            console.log('Stopping RFID monitoring immediately');
+            
+            // Stop monitoring to prevent card switching
+            if (subscription) {
+              subscription.remove();
+              subscription = null;
+            }
+            setRfidPollingInterval(null);
+            
+            // Update tracking
+            lastUID = data.uid;
+            lastTime = now;
+            
+            // Process card
+            handleCardDetected(data.uid);
+          } else {
+            console.log('Duplicate card ignored');
+          }
+        } else if (data.status) {
+          console.log('Status data ignored in payment screen');
+        }
+        
+      } catch (parseError) {
+        console.error('JSON parse failed:', parseError.message);
+      }
+    };
     
     try {
-      connectedDevice.monitorCharacteristicForService(
+      subscription = connectedDevice.monitorCharacteristicForService(
         SERVICE_UUID,
         RFID_CHAR_UUID,
-        (error, characteristic) => {
-          if (error) {
-            console.error('RFID monitoring error:', error);
-            if (error.errorCode === 6) {
-              setErrorMessage('Scanner connection lost. Please check the scanner and try again.');
-              setPaymentStatus('failed');
-            }
-            return;
-          }
-          
-          if (characteristic?.value) {
-            try {
-              const rawData = atob(characteristic.value);
-              console.log('Raw RFID data received:', rawData);
-              
-              if (!rawData || rawData.trim() === '') {
-                console.log('Empty RFID data received, skipping...');
-                return;
-              }
-              
-              // Add to buffer
-              rfidBuffer += rawData;
-              console.log('Current buffer:', rfidBuffer);
-              
-              // Try to parse the buffer
-              try {
-                const data = JSON.parse(rfidBuffer);
-                console.log('Parsed RFID data:', data);
-                
-                // Only process actual RFID scan data, ignore status data
-                if (data.uid && data.uid.length > 0 && !data.status) {
-                  // This is actual RFID scan data, not status data
-                  const currentTime = Date.now();
-                  const isNewUID = data.uid !== lastProcessedUID;
-                  const isNewTimestamp = !data.timestamp || data.timestamp !== lastReceivedTimestamp;
-                  
-                  // If no timestamp in data, use current time and check if enough time passed
-                  const timeSinceLastScan = currentTime - (lastReceivedTimestamp || 0);
-                  const isNewScan = isNewUID || timeSinceLastScan > 2000; // 2 second minimum between scans
-                  
-                  if (isNewScan) {
-                    console.log('RFID card detected for payment:', data.uid, 'Time since last:', timeSinceLastScan);
-                    
-                    // Update tracking variables
-                    lastProcessedUID = data.uid;
-                    lastReceivedTimestamp = data.timestamp || currentTime;
-                    
-                    // Handle card detection
-                    handleCardDetected(data.uid);
-                  } else {
-                    console.log('Ignoring old/duplicate card data:', data.uid);
-                  }
-                } else if (data.status) {
-                  // This is status data from scanner characteristic - ignore for payments
-                  console.log('Ignoring status data in payment screen:', data);
-                } else {
-                  console.log('Invalid RFID data format:', data);
-                }
-                rfidBuffer = ''; // Clear buffer on successful parse
-              } catch (parseError) {
-                console.log('JSON parse failed, keeping in buffer. Error:', parseError.message);
-                
-                // Check if buffer is getting too long (prevent infinite buffering)
-                if (rfidBuffer.length > 200) {
-                  console.log('Buffer too long, clearing:', rfidBuffer);
-                  rfidBuffer = '';
-                }
-                
-                // Check if we have a UID but incomplete JSON - try to construct valid JSON
-                if (rfidBuffer.includes('"uid":"') && !rfidBuffer.includes('}')) {
-                  const uidMatch = rfidBuffer.match(/"uid":"([^"]+)"/);
-                  if (uidMatch) {
-                    const uid = uidMatch[1];
-                    console.log('Extracted UID from incomplete data:', uid);
-                    
-                    // Check if it's new
-                    const currentTime = Date.now();
-                    const timeSinceLastScan = currentTime - (lastReceivedTimestamp || 0);
-                    const isNewScan = uid !== lastProcessedUID || timeSinceLastScan > 2000;
-                    
-                    if (isNewScan) {
-                      console.log('Processing extracted UID:', uid);
-                      lastProcessedUID = uid;
-                      lastReceivedTimestamp = currentTime;
-                      handleCardDetected(uid);
-                      rfidBuffer = ''; // Clear buffer
-                    } else {
-                      console.log('Ignoring duplicate extracted UID:', uid);
-                      rfidBuffer = ''; // Clear buffer anyway
-                    }
-                  }
-                }
-              }
-            } catch (error) {
-              console.error('Error processing RFID data:', error);
-              rfidBuffer = ''; // Reset buffer on error
-            }
-          }
-        }
+        handleRFIDData
       );
       
-      setRfidPollingInterval(true);
+      setRfidPollingInterval(subscription);
       
-    } catch (error) {
-      console.error('Error starting BLE RFID monitoring:', error);
+    } catch (startError) {
+      console.error('Failed to start RFID monitoring:', startError);
       setErrorMessage('Failed to start card monitoring. Please try again.');
       setPaymentStatus('failed');
     }
     
+    // Timeout after 60 seconds
     setTimeout(() => {
-      if (rfidPollingInterval) {
-        console.log('BLE RFID polling timeout - stopping');
+      if (subscription && paymentStatus === 'ready') {
+        console.log('RFID monitoring timeout');
+        subscription.remove();
         setRfidPollingInterval(null);
-        if (paymentStatus === 'ready') {
-          setErrorMessage('No card detected within 60 seconds. Please try again.');
-          setPaymentStatus('failed');
-        }
+        setErrorMessage('No card detected within 60 seconds. Please try again.');
+        setPaymentStatus('failed');
       }
     }, 60000);
   };
@@ -464,7 +427,6 @@ const CreatePaymentScreen = () => {
       console.log('Processing detected card:', cardUid);
       
       nfcAnimation.stopAnimation();
-      setRfidPollingInterval(null);
       
       const result = await paymentService.verifyCard(cardUid);
       
@@ -578,7 +540,7 @@ const CreatePaymentScreen = () => {
         console.log('Is invalid PIN?', isInvalidPin);
         
         if (isInvalidPin) {
-          console.log('✅ Invalid PIN detected - staying on PIN entry page');
+          console.log('Invalid PIN detected - staying on PIN entry page');
           if (result.data && result.data.remainingAttempts !== undefined) {
             setPinAttempts(3 - result.data.remainingAttempts);
             setMaxAttempts(3);
@@ -586,18 +548,14 @@ const CreatePaymentScreen = () => {
           } else {
             setPinError('Invalid PIN. Please try again.');
           }
-          setPin(''); // Clear PIN for retry
-          
-          // Make sure we don't call resetPayment or any other state reset
+          setPin('');
           console.log('About to set status to enterPin...');
-          setPaymentStatus('enterPin'); // Explicitly set back to enterPin
+          setPaymentStatus('enterPin');
           console.log('Status set back to enterPin, PIN cleared');
           
-          // Don't call any other functions that might reset state
-          return; // Exit early to prevent any other processing
+          return;
         } else {
           console.log('Other error type - going to failed state');
-          // For all other failures, use the general failure handler
           handlePaymentFailure(result);
         }
       }
@@ -607,17 +565,15 @@ const CreatePaymentScreen = () => {
       console.log('Error message:', error.message);
       console.log('Checking if error contains "invalid pin"...');
       
-      // Check if the error is specifically about invalid PIN
       if (error.message && error.message.toLowerCase().includes('invalid pin')) {
-        console.log('✅ Caught invalid PIN error - staying on PIN entry page');
+        console.log('Caught invalid PIN error - staying on PIN entry page');
         console.log('Setting PIN error and clearing PIN field');
         setPinError('Invalid PIN. Please try again.');
-        setPin(''); // Clear PIN for retry
-        setPaymentStatus('enterPin'); // Stay on PIN entry page
+        setPin('');
+        setPaymentStatus('enterPin');
         console.log('Status set back to enterPin');
       } else {
-        console.log('❌ Other error detected - going to failed state');
-        // For other errors, go to failed state
+        console.log('Other error detected - going to failed state');
         setErrorMessage('An unexpected error occurred. Please try again.');
         setPaymentStatus('failed');
       }
@@ -626,21 +582,6 @@ const CreatePaymentScreen = () => {
   
   const handlePaymentFailure = (result) => {
     switch (result.type) {
-      case 'INVALID_PIN':
-        // Stay on PIN entry page for invalid PIN - don't go to failed state
-        if (result.data && result.data.remainingAttempts !== undefined) {
-          setPinAttempts(3 - result.data.remainingAttempts);
-          setMaxAttempts(3);
-          setPinError(result.message);
-          setPin(''); // Clear PIN for retry
-          // Keep paymentStatus as 'enterPin' - don't change to 'failed'
-        } else {
-          setPinError('Invalid PIN. Please try again.');
-          setPin(''); // Clear PIN for retry
-          // Keep paymentStatus as 'enterPin' - don't change to 'failed'
-        }
-        break;
-        
       case 'CARD_LOCKED':
         setErrorMessage(result.message);
         setPaymentStatus('failed');
@@ -668,6 +609,9 @@ const CreatePaymentScreen = () => {
     nfcAnimation.setValue(1);
     
     if (rfidPollingInterval) {
+      if (typeof rfidPollingInterval === 'object' && rfidPollingInterval.remove) {
+        rfidPollingInterval.remove();
+      }
       setRfidPollingInterval(null);
     }
     
