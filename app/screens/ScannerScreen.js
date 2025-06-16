@@ -25,10 +25,7 @@ import styles from '../styles/ScannerScreenStyles';
 
 // BLE Service and Characteristic UUIDs (must match ESP32)
 const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
-const RFID_CHAR_UUID = '12345678-1234-1234-1234-123456789abd';
 const STATUS_CHAR_UUID = '12345678-1234-1234-1234-123456789abe';
-const CONFIG_CHAR_UUID = '12345678-1234-1234-1234-123456789abf';
-const CONTROL_CHAR_UUID = '12345678-1234-1234-1234-123456789ac0';
 
 const ScannerScreen = () => {
   const navigation = useNavigation();
@@ -67,7 +64,7 @@ const ScannerScreen = () => {
   const [lastActive, setLastActive] = useState('Never');
   const [bluetoothState, setBluetoothState] = useState('Unknown');
   const [discoveredDevices, setDiscoveredDevices] = useState([]);
-  const [scannerStatus, setScannerStatus] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState(null);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
   
   // Scanner details
@@ -499,8 +496,8 @@ const ScannerScreen = () => {
       
       await device.discoverAllServicesAndCharacteristics();
       
-      // Set up characteristic monitoring for status only
-      await setupCharacteristicMonitoring(device);
+      // Only set up basic connection monitoring for status (not RFID data)
+      await setupConnectionMonitoring(device);
       
       setConnectedDevice(device);
       setScannerConnected(true);
@@ -515,21 +512,18 @@ const ScannerScreen = () => {
     }
   };
 
-  // Set up characteristic monitoring for status only
-  const setupCharacteristicMonitoring = async (device) => {
+  // Set up basic connection monitoring - NO RFID data handling
+  const setupConnectionMonitoring = async (device) => {
     try {
-      console.log('Setting up status characteristic monitoring...');
+      console.log('Setting up basic connection monitoring...');
       
-      // Buffer for collecting fragmented data
-      let statusBuffer = '';
-      
-      // Monitor status characteristic with buffering
+      // Monitor only connection status, not RFID data
       device.monitorCharacteristicForService(
         SERVICE_UUID,
         STATUS_CHAR_UUID,
         (error, characteristic) => {
           if (error) {
-            console.error('Status monitoring error:', error);
+            console.error('Connection monitoring error:', error);
             if (error.errorCode === 6) {
               handleDeviceDisconnection();
             }
@@ -539,46 +533,33 @@ const ScannerScreen = () => {
           if (characteristic?.value) {
             try {
               const rawData = atob(characteristic.value);
-              console.log('Raw status data received:', rawData);
               
               if (!rawData || rawData.trim() === '') {
-                console.log('Empty status data received, skipping...');
                 return;
               }
               
-              try {
-                const data = JSON.parse(rawData);
-                console.log('Parsed status data:', data);
-                setScannerStatus(data);
+              // Only process status/connection data, ignore RFID data
+              const data = JSON.parse(rawData);
+              
+              // Only handle status updates, not RFID scans
+              if (data.status || data.uptime !== undefined) {
+                console.log('Scanner status update:', data);
+                setConnectionStatus(data);
                 setLastActive('just now');
-                statusBuffer = ''; // Clear buffer on success
-              } catch (parseError) {
-                // Try buffering
-                statusBuffer += rawData;
-                console.log('Buffering status data, current buffer:', statusBuffer);
-                
-                try {
-                  const data = JSON.parse(statusBuffer);
-                  console.log('Parsed buffered status data:', data);
-                  setScannerStatus(data);
-                  setLastActive('just now');
-                  statusBuffer = ''; // Clear buffer on success
-                } catch (bufferError) {
-                  console.log('Status buffer still incomplete...');
-                }
               }
-            } catch (error) {
-              console.error('Error processing status data:', error);
-              statusBuffer = ''; // Reset buffer on error
+              // Ignore any RFID data (uid, etc.) - that's handled in payment screen
+              
+            } catch (parseError) {
+              console.log('Status data parse error (normal):', parseError.message);
             }
           }
         }
       );
       
-      console.log('Characteristic monitoring setup complete');
+      console.log('Connection monitoring setup complete');
       
     } catch (error) {
-      console.error('Error setting up monitoring:', error);
+      console.error('Error setting up connection monitoring:', error);
       Alert.alert(
         'Setup Error',
         'Failed to set up device communication. Please reconnect to the scanner.'
@@ -592,6 +573,7 @@ const ScannerScreen = () => {
     setScannerConnected(false);
     setConnectedDevice(null);
     setLastActive('Disconnected');
+    setConnectionStatus(null);
     
     // Try to auto-reconnect after a delay
     setTimeout(() => {
@@ -622,6 +604,7 @@ const ScannerScreen = () => {
         setConnectedDevice(null);
         setScannerConnected(false);
         setLastActive('Disconnected');
+        setConnectionStatus(null);
         await AsyncStorage.removeItem('savedScannerDeviceId');
       }
     } catch (error) {
@@ -1019,7 +1002,7 @@ const ScannerScreen = () => {
       {/* Greeting Section */}
       <View style={styles.greetingSection}>
         <Text style={styles.greeting}>Hello, Coffee Shop</Text>
-        <Text style={styles.greetingSubtext}>Manage your BLE RFID scanner</Text>
+        <Text style={styles.greetingSubtext}>Manage your BLE RFID scanner connection</Text>
       </View>
       
       <ScrollView 
@@ -1261,11 +1244,11 @@ const ScannerScreen = () => {
               </View>
             )}
 
-            {scannerStatus && (
+            {connectionStatus && connectionStatus.uptime !== undefined && (
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Scanner Uptime</Text>
                 <Text style={styles.detailValue}>
-                  {Math.floor(scannerStatus.uptime / 1000 / 60)} minutes
+                  {Math.floor(connectionStatus.uptime / 1000 / 60)} minutes
                 </Text>
               </View>
             )}
@@ -1317,7 +1300,7 @@ const ScannerScreen = () => {
             <Text style={{ fontWeight: 'bold' }}>Step 3:</Text> Tap "Scan for Devices" below{'\n'}
             <Text style={{ fontWeight: 'bold' }}>Step 4:</Text> Select "TapyzeScanner" from the list{'\n'}
             <Text style={{ fontWeight: 'bold' }}>Step 5:</Text> Wait for connection confirmation{'\n'}
-            <Text style={{ fontWeight: 'bold' }}>Step 6:</Text> Navigate to Payments to start scanning{'\n\n'}
+            <Text style={{ fontWeight: 'bold' }}>Step 6:</Text> Navigate to Payments to start accepting payments{'\n\n'}
             <Text style={{ fontWeight: 'bold' }}>Troubleshooting:</Text>{'\n'}
             • Grant Location and Nearby devices permissions{'\n'}
             • Enable Location services in Settings{'\n'}
