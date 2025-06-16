@@ -12,7 +12,7 @@ import {
   Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 
@@ -25,8 +25,6 @@ import styles from '../styles/CreatePaymentScreenStyles';
 const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
 const RFID_CHAR_UUID = '12345678-1234-1234-1234-123456789abd';
 const STATUS_CHAR_UUID = '12345678-1234-1234-1234-123456789abe';
-const CONFIG_CHAR_UUID = '12345678-1234-1234-1234-123456789abf';
-const CONTROL_CHAR_UUID = '12345678-1234-1234-1234-123456789ac0';
 
 const CreatePaymentScreen = () => {
   const navigation = useNavigation();
@@ -49,76 +47,251 @@ const CreatePaymentScreen = () => {
   const [pinAttempts, setPinAttempts] = useState(0);
   const [maxAttempts, setMaxAttempts] = useState(3);
 
-  // BLE states
+  // BLE states - now with event-driven connection monitoring
   const [manager, setManager] = useState(null);
   const [connectedDevice, setConnectedDevice] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState('checking'); // checking, connected, disconnected, error
+  const [connectionError, setConnectionError] = useState('');
+  const [autoReconnectAttempts, setAutoReconnectAttempts] = useState(0);
+  const [maxReconnectAttempts] = useState(3);
 
   // Get constants from service
   const CURRENCY = paymentService.getCurrency();
   const MIN_AMOUNT = paymentService.getMinAmount();
   const PIN_LENGTH = paymentService.getPinLength();
 
-  // Initialize BLE and establish connection - Production version
+  // Initialize BLE and establish dynamic connection monitoring
   useEffect(() => {
     const initializeBLE = async () => {
       try {
         if (!Device.isDevice) {
-          setErrorMessage('Physical device required for BLE functionality');
+          setConnectionError('Physical device required for BLE functionality');
+          setConnectionStatus('error');
           return;
         }
 
         const { BleManager } = await import('react-native-ble-plx');
         if (!BleManager) {
-          setErrorMessage('BLE Manager not available - development build required');
+          setConnectionError('BLE Manager not available - development build required');
+          setConnectionStatus('error');
           return;
         }
 
         const bleManager = new BleManager();
         setManager(bleManager);
-
-        const savedDeviceId = await AsyncStorage.getItem('savedScannerDeviceId');
-        if (!savedDeviceId) {
-          setErrorMessage('No scanner assigned. Please connect scanner first.');
-          return;
-        }
-
-        try {
-          console.log('Establishing BLE connection for payments:', savedDeviceId);
-          
-          // Connect to device
-          const device = await bleManager.connectToDevice(savedDeviceId);
-          
-          // Request optimal MTU for complete data packets
-          try {
-            await device.requestMTU(512);
-            console.log('MTU optimized for payments');
-          } catch (mtuError) {
-            console.warn('MTU optimization failed:', mtuError.message);
-          }
-          
-          // Discover services and characteristics
-          await device.discoverAllServicesAndCharacteristics();
-          
-          // Verify connection by testing a read
-          await device.readCharacteristicForService(SERVICE_UUID, STATUS_CHAR_UUID);
-          
-          setConnectedDevice(device);
-          console.log('BLE connection ready for payments');
-          
-        } catch (connectionError) {
-          console.error('BLE connection failed:', connectionError);
-          setErrorMessage('Cannot connect to scanner. Please ensure scanner is powered on and nearby.');
-        }
+        
+        console.log('BLE Manager initialized for payments');
+        
+        // Start dynamic connection monitoring
+        startConnectionMonitoring(bleManager);
         
       } catch (initError) {
         console.error('BLE initialization failed:', initError);
-        setErrorMessage('BLE initialization failed. Development build may be required.');
+        setConnectionError(`BLE initialization failed: ${initError.message}`);
+        setConnectionStatus('error');
       }
     };
 
     initializeBLE();
   }, []);
+
+  // Manual reconnection check
+  const manualReconnectionCheck = async () => {
+    if (!manager) return;
+    
+    console.log('Manual reconnection check triggered...');
+    setConnectionStatus('checking');
+    setConnectionError('');
+    
+    try {
+      const savedDeviceId = await AsyncStorage.getItem('savedScannerDeviceId');
+      
+      if (!savedDeviceId) {
+        setConnectionError('No scanner assigned. Please connect scanner first.');
+        setConnectionStatus('disconnected');
+        return;
+      }
+
+      console.log('Attempting manual reconnection to:', savedDeviceId);
+      
+      const device = await manager.connectToDevice(savedDeviceId);
+      
+      // Request optimal MTU
+      try {
+        await device.requestMTU(512);
+      } catch (mtuError) {
+        console.warn('MTU optimization failed:', mtuError.message);
+      }
+      
+      await device.discoverAllServicesAndCharacteristics();
+      
+      // Set up disconnection event listener
+      device.onDisconnected((error, disconnectedDevice) => {
+        console.log('Device disconnected event:', error?.message || 'Clean disconnect');
+        setConnectedDevice(null);
+        setConnectionStatus('disconnected');
+        setConnectionError('Scanner disconnected unexpectedly');
+        
+        // Stop any ongoing RFID monitoring
+        if (rfidPollingInterval) {
+          if (typeof rfidPollingInterval === 'object' && rfidPollingInterval.remove) {
+            rfidPollingInterval.remove();
+          }
+          setRfidPollingInterval(null);
+        }
+        
+        // If payment is in progress, show error
+        if (paymentStatus === 'ready' || paymentStatus === 'processing') {
+          setErrorMessage('Scanner connection lost during payment');
+          setPaymentStatus('failed');
+        }
+      });
+      
+      setConnectedDevice(device);
+      setConnectionStatus('connected');
+      setConnectionError('');
+      setAutoReconnectAttempts(0);
+      
+      console.log('Manual reconnection successful');
+      
+    } catch (error) {
+      console.error('Manual reconnection failed:', error);
+      setConnectionError('Failed to reconnect. Please check scanner is powered on and nearby.');
+      setConnectionStatus('disconnected');
+    }
+  };
+  const startConnectionMonitoring = async (bleManager) => {
+    console.log('Starting event-driven BLE connection monitoring...');
+    
+    const establishConnection = async () => {
+      try {
+        const savedDeviceId = await AsyncStorage.getItem('savedScannerDeviceId');
+        
+        if (!savedDeviceId) {
+          setConnectionError('No scanner assigned. Please connect scanner first.');
+          setConnectionStatus('disconnected');
+          return;
+        }
+
+        // Only attempt connection if we don't have one
+        if (!connectedDevice) {
+          console.log('Attempting to connect to scanner:', savedDeviceId);
+          setConnectionStatus('checking');
+          
+          try {
+            const device = await bleManager.connectToDevice(savedDeviceId);
+            
+            // Request optimal MTU
+            try {
+              await device.requestMTU(512);
+            } catch (mtuError) {
+              console.warn('MTU optimization failed:', mtuError.message);
+            }
+            
+            await device.discoverAllServicesAndCharacteristics();
+            
+            // Set up disconnection event listener
+            device.onDisconnected((error, disconnectedDevice) => {
+              console.log('Device disconnected event:', error?.message || 'Clean disconnect');
+              setConnectedDevice(null);
+              setConnectionStatus('disconnected');
+              setConnectionError('Scanner disconnected unexpectedly');
+              
+              // Stop any ongoing RFID monitoring
+              if (rfidPollingInterval) {
+                if (typeof rfidPollingInterval === 'object' && rfidPollingInterval.remove) {
+                  rfidPollingInterval.remove();
+                }
+                setRfidPollingInterval(null);
+              }
+              
+              // If payment is in progress, show error
+              if (paymentStatus === 'ready' || paymentStatus === 'processing') {
+                setErrorMessage('Scanner connection lost during payment');
+                setPaymentStatus('failed');
+              }
+            });
+            
+            setConnectedDevice(device);
+            setConnectionStatus('connected');
+            setConnectionError('');
+            setAutoReconnectAttempts(0);
+            
+            console.log('BLE connection established for payments');
+            
+          } catch (connectionError) {
+            console.error('Connection failed:', connectionError);
+            
+            setAutoReconnectAttempts(prev => prev + 1);
+            
+            if (autoReconnectAttempts >= maxReconnectAttempts) {
+              setConnectionError('Cannot connect to scanner. Please check scanner is powered on and nearby.');
+              setConnectionStatus('disconnected');
+            } else {
+              setConnectionStatus('checking');
+              console.log(`Reconnection attempt ${autoReconnectAttempts + 1}/${maxReconnectAttempts}`);
+              
+              // Retry after delay
+              setTimeout(establishConnection, 2000);
+            }
+          }
+        } else {
+          // We already have a device, just verify it's connected
+          setConnectionStatus('connected');
+          setConnectionError('');
+        }
+        
+      } catch (error) {
+        console.error('Connection setup error:', error);
+        setConnectionError('Connection setup failed');
+        setConnectionStatus('error');
+      }
+    };
+
+    // Initial connection attempt
+    await establishConnection();
+  };
+
+  // Remove periodic monitoring - use event-driven approach only
+  useEffect(() => {
+    return () => {
+      // Only cleanup RFID monitoring, not connection monitoring
+      if (rfidPollingInterval) {
+        if (typeof rfidPollingInterval === 'object' && rfidPollingInterval.remove) {
+          rfidPollingInterval.remove();
+        }
+        setRfidPollingInterval(null);
+      }
+    };
+  }, []);
+
+  // Monitor connection status changes and update UI accordingly
+  useEffect(() => {
+    if (connectionStatus === 'disconnected' || connectionStatus === 'error') {
+      // If we're in ready or processing state and lose connection, show error
+      if (paymentStatus === 'ready' || paymentStatus === 'processing') {
+        setErrorMessage(connectionError || 'Scanner connection lost');
+        setPaymentStatus('failed');
+        
+        // Stop any ongoing RFID monitoring
+        if (rfidPollingInterval) {
+          if (typeof rfidPollingInterval === 'object' && rfidPollingInterval.remove) {
+            rfidPollingInterval.remove();
+          }
+          setRfidPollingInterval(null);
+        }
+      }
+    }
+  }, [connectionStatus, connectionError, paymentStatus]);
+
+  // Reset auto-reconnect attempts when connection is successful
+  useEffect(() => {
+    if (connectionStatus === 'connected') {
+      setAutoReconnectAttempts(0);
+    }
+  }, [connectionStatus]);
   
+  // Remove periodic connection monitoring from cleanup
   useEffect(() => {
     // Animate card scaling on mount
     Animated.timing(scaleAnimation, {
@@ -295,8 +468,14 @@ const CreatePaymentScreen = () => {
       return;
     }
     
+    // Check current connection status
+    if (connectionStatus !== 'connected') {
+      setErrorMessage('Scanner not connected. Please ensure scanner is powered on and nearby.');
+      return;
+    }
+
     if (!connectedDevice) {
-      setErrorMessage('Scanner not connected. Please go back and connect scanner first.');
+      setErrorMessage('No active scanner connection. Please check scanner connection.');
       return;
     }
     
@@ -325,12 +504,13 @@ const CreatePaymentScreen = () => {
     ).start();
   };
 
-  // CLEAN RFID Monitoring - No buffering, production ready
+  // Enhanced RFID Monitoring - no interference from connection checking
   const startRFIDPolling = () => {
-    console.log('Starting BLE RFID monitoring for payment...');
+    console.log('Starting RFID monitoring for payment...');
     
-    if (!connectedDevice) {
-      setErrorMessage('Cannot connect to scanner. Please check scanner connection.');
+    // Verify connection once before starting RFID monitoring
+    if (connectionStatus !== 'connected' || !connectedDevice) {
+      setErrorMessage('Scanner not connected. Please check scanner connection.');
       setPaymentStatus('failed');
       return;
     }
@@ -342,9 +522,13 @@ const CreatePaymentScreen = () => {
     const handleRFIDData = (error, characteristic) => {
       if (error) {
         console.error('RFID monitoring error:', error);
+        
+        // Connection lost during RFID monitoring
         if (error.errorCode === 6) {
-          setErrorMessage('Scanner connection lost. Please check the scanner and try again.');
+          setErrorMessage('Scanner connection lost during payment. Please reconnect and try again.');
           setPaymentStatus('failed');
+          setConnectedDevice(null);
+          setConnectionStatus('disconnected');
         }
         return;
       }
@@ -387,7 +571,7 @@ const CreatePaymentScreen = () => {
             console.log('Duplicate card ignored');
           }
         } else if (data.status) {
-          console.log('Status data ignored in payment screen');
+          console.log('Status data ignored during RFID monitoring');
         }
         
       } catch (parseError) {
@@ -396,6 +580,7 @@ const CreatePaymentScreen = () => {
     };
     
     try {
+      console.log('Setting up RFID characteristic monitoring...');
       subscription = connectedDevice.monitorCharacteristicForService(
         SERVICE_UUID,
         RFID_CHAR_UUID,
@@ -403,6 +588,7 @@ const CreatePaymentScreen = () => {
       );
       
       setRfidPollingInterval(subscription);
+      console.log('RFID monitoring active - waiting for card...');
       
     } catch (startError) {
       console.error('Failed to start RFID monitoring:', startError);
@@ -630,6 +816,83 @@ const CreatePaymentScreen = () => {
     setCustomerInfo(null);
     setPinAttempts(0);
   };
+
+  // Render connection status indicator with reload button
+  const renderConnectionStatus = () => {
+    let statusColor, statusText, statusIcon;
+    
+    switch (connectionStatus) {
+      case 'connected':
+        statusColor = '#4CAF50';
+        statusText = 'Scanner Connected';
+        statusIcon = 'bluetooth';
+        break;
+      case 'checking':
+        statusColor = '#FF9800';
+        statusText = 'Connecting to Scanner...';
+        statusIcon = 'bluetooth-outline';
+        break;
+      case 'disconnected':
+        statusColor = '#F44336';
+        statusText = 'Scanner Disconnected';
+        statusIcon = 'bluetooth-outline';
+        break;
+      case 'error':
+        statusColor = '#F44336';
+        statusText = 'Connection Error';
+        statusIcon = 'alert-circle-outline';
+        break;
+      default:
+        statusColor = '#9E9E9E';
+        statusText = 'Unknown Status';
+        statusIcon = 'help-circle-outline';
+    }
+
+    return (
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: statusColor + '20',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+        marginBottom: 16,
+        borderLeftWidth: 3,
+        borderLeftColor: statusColor,
+      }}>
+        <Ionicons name={statusIcon} size={16} color={statusColor} />
+        <Text style={{
+          marginLeft: 8,
+          fontSize: 14,
+          color: statusColor,
+          fontWeight: '600',
+          flex: 1,
+        }}>
+          {statusText}
+        </Text>
+        
+        {connectionStatus === 'checking' && (
+          <ActivityIndicator size="small" color={statusColor} style={{ marginLeft: 8 }} />
+        )}
+        
+        {/* Reload button for disconnected state */}
+        {(connectionStatus === 'disconnected' || connectionStatus === 'error') && (
+          <TouchableOpacity
+            style={{
+              marginLeft: 8,
+              padding: 4,
+              borderRadius: 4,
+              backgroundColor: statusColor + '30',
+            }}
+            onPress={manualReconnectionCheck}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="reload-outline" size={16} color={statusColor} />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
     
   const renderAmountDisplay = () => {
     return (
@@ -750,6 +1013,7 @@ const CreatePaymentScreen = () => {
               <Text style={styles.cardSubtitle}>Enter the amount to charge</Text>
             </View>
             
+            {renderConnectionStatus()}
             {renderAmountDisplay()}
             {renderNumberPad()}
             
@@ -766,11 +1030,11 @@ const CreatePaymentScreen = () => {
               <TouchableOpacity
                 style={[
                   styles.nextButton,
-                  (!amount || parseFloat(amount) <= MIN_AMOUNT) ? styles.disabledButton : {}
+                  (!amount || parseFloat(amount) <= MIN_AMOUNT || connectionStatus !== 'connected') ? styles.disabledButton : {}
                 ]}
                 activeOpacity={0.8}
                 onPress={handleNextPress}
-                disabled={!amount || parseFloat(amount) <= MIN_AMOUNT}
+                disabled={!amount || parseFloat(amount) <= MIN_AMOUNT || connectionStatus !== 'connected'}
               >
                 <Ionicons name="card-outline" size={20} color="#FFFFFF" />
                 <Text style={styles.buttonText}>Proceed</Text>
@@ -791,6 +1055,8 @@ const CreatePaymentScreen = () => {
               <Text style={styles.cardTitle}>Ready For Payment</Text>
               <Text style={styles.cardSubtitle}>Present RFID card to complete transaction</Text>
             </View>
+            
+            {renderConnectionStatus()}
             
             <View style={styles.amountSummary}>
               <Text style={styles.amountLabel}>Amount:</Text>
@@ -828,10 +1094,21 @@ const CreatePaymentScreen = () => {
             <TouchableOpacity
               style={styles.cancelButton}
               activeOpacity={0.8}
-              onPress={resetPayment}
+              onPress={() => {
+                // Allow immediate cancellation and navigation back if connection lost
+                if (connectionStatus !== 'connected') {
+                  resetPayment();
+                  navigation.goBack();
+                } else {
+                  // Normal cancellation flow - just reset payment
+                  resetPayment();
+                }
+              }}
             >
               <Ionicons name="close-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.buttonText}>Cancel Transaction</Text>
+              <Text style={styles.buttonText}>
+                {connectionStatus !== 'connected' ? 'Go Back' : 'Cancel Transaction'}
+              </Text>
             </TouchableOpacity>
           </Animated.View>
         );
@@ -862,6 +1139,8 @@ const CreatePaymentScreen = () => {
               <Text style={styles.cardSubtitle}>Please enter your 4-digit PIN to complete payment</Text>
             </View>
 
+            {renderConnectionStatus()}
+
             <View style={styles.amountSummary}>
               <Text style={styles.amountLabel}>Amount to Pay:</Text>
               <Text style={styles.summaryAmount}>{CURRENCY} {formatAmount(amount)}</Text>
@@ -883,11 +1162,11 @@ const CreatePaymentScreen = () => {
               <TouchableOpacity
                 style={[
                   styles.nextButton,
-                  (pin.length !== PIN_LENGTH) ? styles.disabledButton : {}
+                  (pin.length !== PIN_LENGTH || connectionStatus !== 'connected') ? styles.disabledButton : {}
                 ]}
                 activeOpacity={0.8}
                 onPress={handlePinSubmit}
-                disabled={pin.length !== PIN_LENGTH}
+                disabled={pin.length !== PIN_LENGTH || connectionStatus !== 'connected'}
               >
                 <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
                 <Text style={styles.buttonText}>Confirm</Text>
@@ -918,6 +1197,8 @@ const CreatePaymentScreen = () => {
               <Text style={styles.cardSubtitle}>Please wait while we complete your transaction</Text>
             </View>
             
+            {renderConnectionStatus()}
+            
             <View style={styles.processingContainer}>
               <ActivityIndicator size="large" color="#ed7b0e" />
               
@@ -933,6 +1214,31 @@ const CreatePaymentScreen = () => {
                 </Text>
               </View>
             </View>
+
+            {/* Add cancel button for processing state in case of connection issues */}
+            <TouchableOpacity
+              style={[styles.cancelButton, { marginTop: 20 }]}
+              activeOpacity={0.8}
+              onPress={() => {
+                Alert.alert(
+                  "Cancel Transaction?", 
+                  "Are you sure you want to cancel this payment in progress?",
+                  [
+                    { text: "Continue", style: "cancel" },
+                    { 
+                      text: "Cancel", 
+                      onPress: () => {
+                        resetPayment();
+                        navigation.goBack();
+                      }
+                    }
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="close-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.buttonText}>Cancel Transaction</Text>
+            </TouchableOpacity>
           </Animated.View>
         );
       
@@ -1025,6 +1331,8 @@ const CreatePaymentScreen = () => {
               </Text>
             </View>
             
+            {renderConnectionStatus()}
+            
             <View style={styles.resultDetails}>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Attempted Amount</Text>
@@ -1063,20 +1371,41 @@ const CreatePaymentScreen = () => {
               
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Error</Text>
-                <Text style={styles.errorValue}>{errorMessage || 'Payment processing failed'}</Text>
+                <Text style={styles.errorValue}>
+                  {errorMessage || connectionError || 'Payment processing failed'}
+                </Text>
               </View>
             </View>
             
             <View style={styles.actionContainer}>
               <TouchableOpacity
-                style={styles.retryButton}
+                style={[
+                  styles.retryButton,
+                  connectionStatus !== 'connected' ? styles.disabledButton : {}
+                ]}
                 activeOpacity={0.8}
                 onPress={resetPayment}
+                disabled={connectionStatus !== 'connected'}
               >
                 <Ionicons name="refresh-outline" size={20} color="#FFFFFF" />
-                <Text style={styles.buttonText}>Try Again</Text>
+                <Text style={styles.buttonText}>
+                  {connectionStatus === 'connected' ? 'Try Again' : 'Connect Scanner First'}
+                </Text>
               </TouchableOpacity>
             </View>
+
+            {/* Always show cancel button for failed payments */}
+            <TouchableOpacity
+              style={styles.cancelButton}
+              activeOpacity={0.8}
+              onPress={() => {
+                resetPayment();
+                navigation.goBack();
+              }}
+            >
+              <Ionicons name="close-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.buttonText}>Cancel Transaction</Text>
+            </TouchableOpacity>
           </Animated.View>
         );
       
