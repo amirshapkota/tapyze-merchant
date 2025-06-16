@@ -68,7 +68,6 @@ const ScannerScreen = () => {
   const [bluetoothState, setBluetoothState] = useState('Unknown');
   const [discoveredDevices, setDiscoveredDevices] = useState([]);
   const [scannerStatus, setScannerStatus] = useState(null);
-  const [lastRfidData, setLastRfidData] = useState(null);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
   
   // Scanner details
@@ -500,7 +499,7 @@ const ScannerScreen = () => {
       
       await device.discoverAllServicesAndCharacteristics();
       
-      // Set up characteristic monitoring for RFID data
+      // Set up characteristic monitoring for status only
       await setupCharacteristicMonitoring(device);
       
       setConnectedDevice(device);
@@ -516,100 +515,13 @@ const ScannerScreen = () => {
     }
   };
 
-  // Set up characteristic monitoring for RFID data
+  // Set up characteristic monitoring for status only
   const setupCharacteristicMonitoring = async (device) => {
     try {
-      console.log('Setting up RFID characteristic monitoring...');
+      console.log('Setting up status characteristic monitoring...');
       
       // Buffer for collecting fragmented data
-      let rfidBuffer = '';
       let statusBuffer = '';
-      
-      // Monitor RFID characteristic for incoming card data
-      device.monitorCharacteristicForService(
-        SERVICE_UUID,
-        RFID_CHAR_UUID,
-        (error, characteristic) => {
-          if (error) {
-            console.error('RFID monitoring error:', error);
-            if (error.errorCode === 6) {
-              handleDeviceDisconnection();
-            }
-            return;
-          }
-          
-          if (characteristic?.value) {
-            try {
-              const rawData = atob(characteristic.value);
-              console.log('Raw RFID data received:', rawData);
-              
-              if (!rawData || rawData.trim() === '') {
-                console.log('Empty RFID data received, skipping...');
-                return;
-              }
-              
-              // Try to parse immediately, or buffer if incomplete
-              try {
-                const data = JSON.parse(rawData);
-                console.log('Parsed RFID data:', data);
-                
-                const uid = data.uid;
-                const timestamp = data.timestamp || data.time;
-                
-                if (uid && timestamp) {
-                  const rfidData = { uid, timestamp };
-                  setLastRfidData(rfidData);
-                  setLastActive('just now');
-                  
-                  AsyncStorage.setItem('lastRfidScan', JSON.stringify(rfidData))
-                    .catch(error => console.error('Failed to save RFID data:', error));
-                    
-                  Alert.alert(
-                    'Card Scanned! 🎉',
-                    `UID: ${uid}`,
-                    [{ text: 'OK' }]
-                  );
-                }
-                rfidBuffer = ''; // Clear buffer on success
-              } catch (parseError) {
-                // Data might be fragmented, try buffering
-                rfidBuffer += rawData;
-                console.log('Buffering RFID data, current buffer:', rfidBuffer);
-                
-                try {
-                  const data = JSON.parse(rfidBuffer);
-                  console.log('Parsed buffered RFID data:', data);
-                  
-                  const uid = data.uid;
-                  const timestamp = data.timestamp || data.time;
-                  
-                  if (uid && timestamp) {
-                    const rfidData = { uid, timestamp };
-                    setLastRfidData(rfidData);
-                    setLastActive('just now');
-                    
-                    AsyncStorage.setItem('lastRfidScan', JSON.stringify(rfidData))
-                      .catch(error => console.error('Failed to save RFID data:', error));
-                      
-                    Alert.alert(
-                      'Card Scanned! 🎉',
-                      `UID: ${uid}`,
-                      [{ text: 'OK' }]
-                    );
-                  }
-                  rfidBuffer = ''; // Clear buffer on success
-                } catch (bufferError) {
-                  console.log('Buffer still incomplete, waiting for more data...');
-                  // Keep buffering
-                }
-              }
-            } catch (error) {
-              console.error('Error processing RFID data:', error);
-              rfidBuffer = ''; // Reset buffer on error
-            }
-          }
-        }
-      );
       
       // Monitor status characteristic with buffering
       device.monitorCharacteristicForService(
@@ -618,6 +530,9 @@ const ScannerScreen = () => {
         (error, characteristic) => {
           if (error) {
             console.error('Status monitoring error:', error);
+            if (error.errorCode === 6) {
+              handleDeviceDisconnection();
+            }
             return;
           }
           
@@ -684,41 +599,6 @@ const ScannerScreen = () => {
         autoConnectToSavedScanner();
       }
     }, 3000);
-  };
-
-  // Send control command to scanner
-  const sendControlCommand = async (command) => {
-    if (!connectedDevice) {
-      Alert.alert('Error', 'No device connected');
-      return;
-    }
-
-    try {
-      const commandJson = JSON.stringify(command);
-      console.log('Sending control command:', commandJson);
-      
-      // Convert to base64
-      const base64Command = btoa(commandJson);
-      
-      await connectedDevice.writeCharacteristicWithResponseForService(
-        SERVICE_UUID,
-        CONTROL_CHAR_UUID,
-        base64Command
-      );
-      
-      console.log('Control command sent successfully');
-    } catch (error) {
-      console.error('Error sending control command:', error);
-      Alert.alert(
-        'Command Error',
-        `Failed to send command: ${error.message}`
-      );
-    }
-  };
-
-  // Test ESP32 communication
-  const testESP32Communication = async () => {
-    await sendControlCommand({ command: 'get_status' });
   };
 
   // Auto-connect to saved scanner
@@ -788,7 +668,7 @@ const ScannerScreen = () => {
             Checking scanner assignment...
           </Text>
           <Text style={{ marginTop: 10, fontSize: 14, color: '#888', textAlign: 'center' }}>
-            Platform: {Platform.OS} {Platform.Version}
+            Device: {Device.isDevice ? 'Physical Device' : 'Simulator/Emulator'}
           </Text>
           {bleError && (
             <Text style={{ marginTop: 10, fontSize: 12, color: '#e74c3c', textAlign: 'center' }}>
@@ -891,7 +771,7 @@ const ScannerScreen = () => {
                 You need to assign a Bluetooth RFID scanner to your account before you can start accepting payments.
               </Text>
 
-              {/* Platform info */}
+              {/* Device info */}
               <View style={{
                 backgroundColor: '#f8f9fa',
                 padding: 12,
@@ -901,7 +781,7 @@ const ScannerScreen = () => {
                 borderLeftColor: bleAvailable ? '#28a745' : '#dc3545'
               }}>
                 <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
-                  Platform: {Platform.OS} {Platform.Version} | Device: {Device.isDevice ? 'Physical' : 'Simulator'}
+                  Device: {Device.isDevice ? 'Physical Device' : 'Simulator/Emulator'}
                 </Text>
                 <Text style={{ fontSize: 12, color: '#888', textAlign: 'center', marginTop: 4 }}>
                   BLE: {bleAvailable ? 'Available' : 'Not Available'} | Bluetooth: {bluetoothState}
@@ -1192,7 +1072,7 @@ const ScannerScreen = () => {
               <View style={styles.scanningContainer}>
                 <ActivityIndicator size="small" color="#ed7b0e" />
                 <Text style={styles.scanningText}>
-                  Scanning for BLE devices on {Platform.OS}...
+                  Scanning for BLE devices...
                 </Text>
               </View>
             ) : (
@@ -1224,11 +1104,6 @@ const ScannerScreen = () => {
           </View>
           
           <View style={styles.detailsContainer}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Platform</Text>
-              <Text style={styles.detailValue}>{Platform.OS} {Platform.Version}</Text>
-            </View>
-            
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Device Type</Text>
               <Text style={styles.detailValue}>
@@ -1386,18 +1261,6 @@ const ScannerScreen = () => {
               </View>
             )}
 
-            {lastRfidData && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Last Scanned Card</Text>
-                <Text style={[styles.detailValue, { fontFamily: 'monospace', fontSize: 14 }]}>
-                  {lastRfidData.uid}
-                </Text>
-                <Text style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
-                  {new Date(lastRfidData.timestamp).toLocaleString()}
-                </Text>
-              </View>
-            )}
-
             {scannerStatus && (
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Scanner Uptime</Text>
@@ -1426,35 +1289,8 @@ const ScannerScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Action Buttons */}
+        {/* Action Button */}
         <View style={styles.manualIpButtonContainer}>
-          {/* Test ESP32 Communication */}
-          {scannerConnected && (
-            <TouchableOpacity
-              style={[styles.manualIpButton, { marginBottom: 10, backgroundColor: '#17a2b8' }]}
-              onPress={testESP32Communication}
-            >
-              <Text style={styles.manualIpButtonText}>
-                Test ESP32 Communication
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Clear RFID Button */}
-          {scannerConnected && lastRfidData && (
-            <TouchableOpacity
-              style={[styles.manualIpButton, { marginBottom: 10 }]}
-              onPress={() => {
-                setLastRfidData(null);
-                AsyncStorage.removeItem('lastRfidScan');
-              }}
-            >
-              <Text style={styles.manualIpButtonText}>
-                Clear Last RFID Scan
-              </Text>
-            </TouchableOpacity>
-          )}
-          
           {/* Open Bluetooth Settings */}
           <TouchableOpacity
             style={styles.manualIpButton}
@@ -1481,7 +1317,7 @@ const ScannerScreen = () => {
             <Text style={{ fontWeight: 'bold' }}>Step 3:</Text> Tap "Scan for Devices" below{'\n'}
             <Text style={{ fontWeight: 'bold' }}>Step 4:</Text> Select "TapyzeScanner" from the list{'\n'}
             <Text style={{ fontWeight: 'bold' }}>Step 5:</Text> Wait for connection confirmation{'\n'}
-            <Text style={{ fontWeight: 'bold' }}>Step 6:</Text> Test by scanning an RFID card{'\n\n'}
+            <Text style={{ fontWeight: 'bold' }}>Step 6:</Text> Navigate to Payments to start scanning{'\n\n'}
             <Text style={{ fontWeight: 'bold' }}>Troubleshooting:</Text>{'\n'}
             • Grant Location and Nearby devices permissions{'\n'}
             • Enable Location services in Settings{'\n'}
