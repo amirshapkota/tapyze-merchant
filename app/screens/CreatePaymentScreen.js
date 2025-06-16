@@ -79,8 +79,49 @@ const CreatePaymentScreen = () => {
         const savedDeviceId = await AsyncStorage.getItem('savedScannerDeviceId');
         if (savedDeviceId) {
           try {
-            const device = await bleManager.connectToDevice(savedDeviceId);
+            // First check if device is already connected
+            const connectedDevices = await bleManager.connectedDevices([SERVICE_UUID]);
+            let device = connectedDevices.find(d => d.id === savedDeviceId);
+            
+            if (!device) {
+              // If not connected, try to connect
+              console.log('Connecting to saved device for payments:', savedDeviceId);
+              device = await bleManager.connectToDevice(savedDeviceId);
+            } else {
+              console.log('Device already connected for payments:', savedDeviceId);
+            }
+            
+            // IMPORTANT: Request larger MTU for proper data transfer (like scanner screen)
+            try {
+              await device.requestMTU(512);
+              console.log('MTU requested: 512 for payments');
+            } catch (mtuError) {
+              console.log('MTU request failed, using default:', mtuError.message);
+            }
+            
+            // Ensure services and characteristics are discovered
             await device.discoverAllServicesAndCharacteristics();
+            
+            // Test the connection by trying to read a characteristic
+            try {
+              await device.readCharacteristicForService(SERVICE_UUID, STATUS_CHAR_UUID);
+              console.log('BLE connection verified for payments');
+            } catch (readError) {
+              console.log('BLE characteristic read failed, reconnecting...');
+              // Try to reconnect if read fails
+              device = await bleManager.connectToDevice(savedDeviceId);
+              
+              // Request MTU again after reconnection
+              try {
+                await device.requestMTU(512);
+                console.log('MTU requested: 512 after reconnection');
+              } catch (mtuError2) {
+                console.log('MTU request failed after reconnection:', mtuError2.message);
+              }
+              
+              await device.discoverAllServicesAndCharacteristics();
+            }
+            
             setConnectedDevice(device);
             console.log('Connected to saved BLE device for payments');
           } catch (error) {
@@ -330,55 +371,76 @@ const CreatePaymentScreen = () => {
                 return;
               }
               
+              // Add to buffer
+              rfidBuffer += rawData;
+              console.log('Current buffer:', rfidBuffer);
+              
+              // Try to parse the buffer
               try {
-                const data = JSON.parse(rawData);
+                const data = JSON.parse(rfidBuffer);
                 console.log('Parsed RFID data:', data);
                 
                 if (data.uid && data.uid.length > 0) {
+                  // Check if it's new data
+                  const currentTime = Date.now();
                   const isNewUID = data.uid !== lastProcessedUID;
-                  const isNewTimestamp = data.timestamp !== lastReceivedTimestamp && data.timestamp > 0;
+                  const isNewTimestamp = !data.timestamp || data.timestamp !== lastReceivedTimestamp;
                   
-                  if (isNewUID || isNewTimestamp) {
-                    console.log('RFID card detected for payment:', data.uid, 'Timestamp:', data.timestamp);
+                  // If no timestamp in data, use current time and check if enough time passed
+                  const timeSinceLastScan = currentTime - (lastReceivedTimestamp || 0);
+                  const isNewScan = isNewUID || timeSinceLastScan > 2000; // 2 second minimum between scans
+                  
+                  if (isNewScan) {
+                    console.log('RFID card detected for payment:', data.uid, 'Time since last:', timeSinceLastScan);
                     
+                    // Update tracking variables
                     lastProcessedUID = data.uid;
-                    lastReceivedTimestamp = data.timestamp;
+                    lastReceivedTimestamp = data.timestamp || currentTime;
                     
+                    // Handle card detection
                     handleCardDetected(data.uid);
                   } else {
-                    console.log('Ignoring old card data:', data.uid, 'Timestamp:', data.timestamp);
+                    console.log('Ignoring old/duplicate card data:', data.uid);
                   }
                 }
-                rfidBuffer = '';
+                rfidBuffer = ''; // Clear buffer on successful parse
               } catch (parseError) {
-                rfidBuffer += rawData;
-                console.log('Buffering RFID data, current buffer:', rfidBuffer);
+                console.log('JSON parse failed, keeping in buffer. Error:', parseError.message);
                 
-                try {
-                  const data = JSON.parse(rfidBuffer);
-                  console.log('Parsed buffered RFID data:', data);
-                  
-                  if (data.uid && data.uid.length > 0) {
-                    const isNewUID = data.uid !== lastProcessedUID;
-                    const isNewTimestamp = data.timestamp !== lastReceivedTimestamp && data.timestamp > 0;
+                // Check if buffer is getting too long (prevent infinite buffering)
+                if (rfidBuffer.length > 200) {
+                  console.log('Buffer too long, clearing:', rfidBuffer);
+                  rfidBuffer = '';
+                }
+                
+                // Check if we have a UID but incomplete JSON - try to construct valid JSON
+                if (rfidBuffer.includes('"uid":"') && !rfidBuffer.includes('}')) {
+                  const uidMatch = rfidBuffer.match(/"uid":"([^"]+)"/);
+                  if (uidMatch) {
+                    const uid = uidMatch[1];
+                    console.log('Extracted UID from incomplete data:', uid);
                     
-                    if (isNewUID || isNewTimestamp) {
-                      console.log('RFID card detected for payment (buffered):', data.uid, 'Timestamp:', data.timestamp);
-                      
-                      lastProcessedUID = data.uid;
-                      lastReceivedTimestamp = data.timestamp;
-                      
-                      handleCardDetected(data.uid);
+                    // Check if it's new
+                    const currentTime = Date.now();
+                    const timeSinceLastScan = currentTime - (lastReceivedTimestamp || 0);
+                    const isNewScan = uid !== lastProcessedUID || timeSinceLastScan > 2000;
+                    
+                    if (isNewScan) {
+                      console.log('Processing extracted UID:', uid);
+                      lastProcessedUID = uid;
+                      lastReceivedTimestamp = currentTime;
+                      handleCardDetected(uid);
+                      rfidBuffer = ''; // Clear buffer
+                    } else {
+                      console.log('Ignoring duplicate extracted UID:', uid);
+                      rfidBuffer = ''; // Clear buffer anyway
                     }
                   }
-                  rfidBuffer = '';
-                } catch (bufferError) {
-                  console.log('Buffer still incomplete, waiting for more data...');
                 }
               }
             } catch (error) {
               console.error('Error processing RFID data:', error);
-              rfidBuffer = '';
+              rfidBuffer = ''; // Reset buffer on error
             }
           }
         }
@@ -532,8 +594,14 @@ const CreatePaymentScreen = () => {
             setPinError('Invalid PIN. Please try again.');
           }
           setPin(''); // Clear PIN for retry
+          
+          // Make sure we don't call resetPayment or any other state reset
+          console.log('About to set status to enterPin...');
           setPaymentStatus('enterPin'); // Explicitly set back to enterPin
           console.log('Status set back to enterPin, PIN cleared');
+          
+          // Don't call any other functions that might reset state
+          return; // Exit early to prevent any other processing
         } else {
           console.log('Other error type - going to failed state');
           // For all other failures, use the general failure handler
