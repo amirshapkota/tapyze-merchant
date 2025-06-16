@@ -58,7 +58,7 @@ const CreatePaymentScreen = () => {
   const MIN_AMOUNT = paymentService.getMinAmount();
   const PIN_LENGTH = paymentService.getPinLength();
 
-  // Initialize BLE and check for existing connection
+  // Initialize BLE and establish connection - Production version
   useEffect(() => {
     const initializeBLE = async () => {
       try {
@@ -77,63 +77,42 @@ const CreatePaymentScreen = () => {
         setManager(bleManager);
 
         const savedDeviceId = await AsyncStorage.getItem('savedScannerDeviceId');
-        if (savedDeviceId) {
-          try {
-            // First check if device is already connected
-            const connectedDevices = await bleManager.connectedDevices([SERVICE_UUID]);
-            let device = connectedDevices.find(d => d.id === savedDeviceId);
-            
-            if (!device) {
-              // If not connected, try to connect
-              console.log('Connecting to saved device for payments:', savedDeviceId);
-              device = await bleManager.connectToDevice(savedDeviceId);
-            } else {
-              console.log('Device already connected for payments:', savedDeviceId);
-            }
-            
-            // IMPORTANT: Request larger MTU for proper data transfer (like scanner screen)
-            try {
-              await device.requestMTU(512);
-              console.log('MTU requested: 512 for payments');
-            } catch (mtuError) {
-              console.log('MTU request failed, using default:', mtuError.message);
-            }
-            
-            // Ensure services and characteristics are discovered
-            await device.discoverAllServicesAndCharacteristics();
-            
-            // Test the connection by trying to read a characteristic
-            try {
-              await device.readCharacteristicForService(SERVICE_UUID, STATUS_CHAR_UUID);
-              console.log('BLE connection verified for payments');
-            } catch (readError) {
-              console.log('BLE characteristic read failed, reconnecting...');
-              // Try to reconnect if read fails
-              device = await bleManager.connectToDevice(savedDeviceId);
-              
-              // Request MTU again after reconnection
-              try {
-                await device.requestMTU(512);
-                console.log('MTU requested: 512 after reconnection');
-              } catch (mtuError2) {
-                console.log('MTU request failed after reconnection:', mtuError2.message);
-              }
-              
-              await device.discoverAllServicesAndCharacteristics();
-            }
-            
-            setConnectedDevice(device);
-            console.log('Connected to saved BLE device for payments');
-          } catch (error) {
-            console.error('Failed to connect to saved device:', error);
-            setErrorMessage('Scanner not connected. Please go back and connect scanner first.');
-          }
-        } else {
-          setErrorMessage('No scanner connected. Please connect scanner first.');
+        if (!savedDeviceId) {
+          setErrorMessage('No scanner assigned. Please connect scanner first.');
+          return;
         }
-      } catch (error) {
-        console.error('BLE initialization error:', error);
-        setErrorMessage('BLE not available - development build required');
+
+        try {
+          console.log('Establishing BLE connection for payments:', savedDeviceId);
+          
+          // Connect to device
+          const device = await bleManager.connectToDevice(savedDeviceId);
+          
+          // Request optimal MTU for complete data packets
+          try {
+            await device.requestMTU(512);
+            console.log('MTU optimized for payments');
+          } catch (mtuError) {
+            console.warn('MTU optimization failed:', mtuError.message);
+          }
+          
+          // Discover services and characteristics
+          await device.discoverAllServicesAndCharacteristics();
+          
+          // Verify connection by testing a read
+          await device.readCharacteristicForService(SERVICE_UUID, STATUS_CHAR_UUID);
+          
+          setConnectedDevice(device);
+          console.log('BLE connection ready for payments');
+          
+        } catch (connectionError) {
+          console.error('BLE connection failed:', connectionError);
+          setErrorMessage('Cannot connect to scanner. Please ensure scanner is powered on and nearby.');
+        }
+        
+      } catch (initError) {
+        console.error('BLE initialization failed:', initError);
+        setErrorMessage('BLE initialization failed. Development build may be required.');
       }
     };
 
@@ -141,19 +120,27 @@ const CreatePaymentScreen = () => {
   }, []);
   
   useEffect(() => {
+    // Animate card scaling on mount
     Animated.timing(scaleAnimation, {
       toValue: 1,
       duration: 300,
       useNativeDriver: true
     }).start();
     
+    // Cleanup function
     return () => {
+      console.log('Payment screen cleanup');
+      
       if (processingTimeout) {
         clearTimeout(processingTimeout);
       }
+      
       if (rfidPollingInterval) {
-        clearInterval(rfidPollingInterval);
+        setRfidPollingInterval(null);
       }
+      
+      // Don't disconnect device - keep it for other screens
+      // The BLE connection should persist across screens
     };
   }, []);
   
@@ -380,8 +367,9 @@ const CreatePaymentScreen = () => {
                 const data = JSON.parse(rfidBuffer);
                 console.log('Parsed RFID data:', data);
                 
-                if (data.uid && data.uid.length > 0) {
-                  // Check if it's new data
+                // Only process actual RFID scan data, ignore status data
+                if (data.uid && data.uid.length > 0 && !data.status) {
+                  // This is actual RFID scan data, not status data
                   const currentTime = Date.now();
                   const isNewUID = data.uid !== lastProcessedUID;
                   const isNewTimestamp = !data.timestamp || data.timestamp !== lastReceivedTimestamp;
@@ -402,6 +390,11 @@ const CreatePaymentScreen = () => {
                   } else {
                     console.log('Ignoring old/duplicate card data:', data.uid);
                   }
+                } else if (data.status) {
+                  // This is status data from scanner characteristic - ignore for payments
+                  console.log('Ignoring status data in payment screen:', data);
+                } else {
+                  console.log('Invalid RFID data format:', data);
                 }
                 rfidBuffer = ''; // Clear buffer on successful parse
               } catch (parseError) {
