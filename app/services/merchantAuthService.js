@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://192.168.1.78:5000/api';
+const BASE_URL = 'https://tapyze.onrender.com/api';
 
 class MerchantAuthService {
   constructor() {

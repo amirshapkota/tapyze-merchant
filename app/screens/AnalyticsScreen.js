@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
   Image,
   SafeAreaView,
   ActivityIndicator,
@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
+// Remove chart kit imports - they require SVG
+// import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
 
 import styles from '../styles/AnalyticsScreenStyles';
 
@@ -48,15 +49,11 @@ const paymentMethodData = [
     name: "TAPYZE Card",
     population: 75,
     color: "#ed7b0e",
-    legendFontColor: "#7F7F7F",
-    legendFontSize: 12
   },
   {
     name: "TAPYZE App",
     population: 25,
     color: "#000000",
-    legendFontColor: "#7F7F7F",
-    legendFontSize: 12
   }
 ];
 
@@ -77,12 +74,226 @@ const topProductsData = [
   { name: "Croissant", quantity: 25, revenue: 125.00 }
 ];
 
+// Simple bar chart component using View elements
+const SimpleBarChart = ({ data, height = 150, color = "#ed7b0e" }) => {
+  const maxValue = Math.max(...data.datasets[0].data);
+  
+  return (
+    <View style={{ height, padding: 20, backgroundColor: '#fff' }}>
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        {data.datasets[0].data.map((value, index) => (
+          <View key={index} style={{ alignItems: 'center', flex: 1 }}>
+            <Text style={{ fontSize: 10, marginBottom: 5, fontWeight: 'bold' }}>
+              {Math.round(value)}
+            </Text>
+            <View
+              style={{
+                width: 20,
+                height: (value / maxValue) * (height - 60),
+                backgroundColor: color,
+                borderRadius: 2,
+              }}
+            />
+            <Text style={{ fontSize: 10, marginTop: 5, color: '#666' }}>
+              {data.labels[index]}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+// Clean area chart using stacked bars for smoother appearance
+const SimpleLineChart = ({ data, height = 220, color = "#ed7b0e" }) => {
+  const maxValue = Math.max(...data.datasets[0].data);
+  const minValue = Math.min(...data.datasets[0].data);
+  const range = maxValue - minValue || 1;
+  
+  return (
+    <View style={{ height, backgroundColor: '#fff', borderRadius: 12 }}>
+      {/* Values display at top */}
+      <View style={{ 
+        flexDirection: 'row', 
+        justifyContent: 'space-between',
+        paddingTop: 15,
+        paddingHorizontal: 10,
+        paddingBottom: 5
+      }}>
+        {data.datasets[0].data.map((value, index) => (
+          <Text key={index} style={{ 
+            fontSize: 12, 
+            fontWeight: '600', 
+            color: '#333',
+            textAlign: 'center',
+            flex: 1
+          }}>
+            {value < 1000 ? Math.round(value) : `${(value/1000).toFixed(1)}k`}
+          </Text>
+        ))}
+      </View>
+      
+      {/* Chart area with area fill effect - Full width */}
+      <View style={{ 
+        height: height - 80,
+        width: '100%',
+        flexDirection: 'row', 
+        alignItems: 'flex-end', 
+        backgroundColor: '#f8f9fa',
+        marginHorizontal: 10,
+        borderRadius: 12,
+        paddingVertical: 12,
+        marginBottom: 5
+      }}>
+        {data.datasets[0].data.map((value, index) => {
+          const heightPercentage = range > 0 ? ((value - minValue) / range) * 85 + 15 : 50;
+          const isHighest = value === maxValue;
+          
+          return (
+            <View key={index} style={{ 
+              flex: 1, 
+              alignItems: 'center',
+              height: '100%',
+              justifyContent: 'flex-end',
+              marginHorizontal: 1
+            }}>
+              {/* Area fill bars with gradient effect */}
+              <View style={{
+                width: '95%',
+                height: `${heightPercentage}%`,
+                backgroundColor: color,
+                opacity: 0.15,
+                borderTopLeftRadius: 6,
+                borderTopRightRadius: 6,
+                marginBottom: 3
+              }} />
+              
+              {/* Top line indicator */}
+              <View style={{
+                width: '95%',
+                height: 4,
+                backgroundColor: color,
+                borderRadius: 2,
+                marginBottom: 3
+              }} />
+              
+              {/* Data point dot */}
+              <View style={{
+                width: isHighest ? 10 : 8,
+                height: isHighest ? 10 : 8,
+                borderRadius: isHighest ? 5 : 4,
+                backgroundColor: isHighest ? color : '#fff',
+                borderWidth: 2,
+                borderColor: color,
+                marginBottom: 6,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.2,
+                shadowRadius: 2,
+                elevation: 2,
+              }} />
+            </View>
+          );
+        })}
+      </View>
+      
+      {/* X-axis labels */}
+      <View style={{ 
+        flexDirection: 'row', 
+        justifyContent: 'space-between',
+        paddingHorizontal: 10,
+        paddingBottom: 5
+      }}>
+        {data.labels.map((label, index) => (
+          <Text key={index} style={{ 
+            fontSize: 12, 
+            color: '#666',
+            fontWeight: '500',
+            textAlign: 'center',
+            flex: 1
+          }}>
+            {label}
+          </Text>
+        ))}
+      </View>
+      
+      {/* Trend indicators */}
+      <View style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 10,
+        paddingBottom: 15
+      }}>
+        {data.datasets[0].data.map((value, index) => {
+          if (index === 0) return <View key={index} style={{ flex: 1 }} />;
+          
+          const prevValue = data.datasets[0].data[index - 1];
+          const isUp = value > prevValue;
+          const isFlat = value === prevValue;
+          
+          return (
+            <View key={index} style={{ 
+              alignItems: 'center',
+              flex: 1
+            }}>
+              <Ionicons 
+                name={isFlat ? 'remove' : (isUp ? 'trending-up' : 'trending-down')} 
+                size={14} 
+                color={isFlat ? '#999' : (isUp ? '#28a745' : '#dc3545')} 
+              />
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
+// Simple pie chart using View elements
+const SimplePieChart = ({ data }) => {
+  return (
+    <View style={{ height: 220, padding: 20, backgroundColor: '#fff' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+        <View style={{ width: 120, height: 120, borderRadius: 60, overflow: 'hidden', flexDirection: 'row' }}>
+          {data.map((item, index) => (
+            <View
+              key={index}
+              style={{
+                width: `${item.population}%`,
+                backgroundColor: item.color,
+                height: '100%',
+              }}
+            />
+          ))}
+        </View>
+        <View style={{ marginLeft: 30 }}>
+          {data.map((item, index) => (
+            <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <View
+                style={{
+                  width: 12,
+                  height: 12,
+                  backgroundColor: item.color,
+                  borderRadius: 6,
+                  marginRight: 8,
+                }}
+              />
+              <Text style={{ fontSize: 12, color: '#666' }}>
+                {item.name} ({item.population}%)
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+};
+
 const AnalyticsScreen = () => {
   const navigation = useNavigation();
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState('weekly');
   const [selectedChart, setSelectedChart] = useState('revenue');
-  const [showRevenue, setShowRevenue] = useState(true);
   const screenWidth = Dimensions.get("window").width - 40;
   
   useEffect(() => {
@@ -124,26 +335,6 @@ const AnalyticsScreen = () => {
     return percentChange.toFixed(1);
   };
 
-  const chartConfig = {
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
-    color: (opacity = 1) => `rgba(237, 123, 14, ${opacity})`,
-    strokeWidth: 2,
-    barPercentage: 0.7,
-    decimalPlaces: 0,
-    style: {
-      borderRadius: 16
-    },
-    propsForLabels: {
-      fontSize: 10,
-    }
-  };
-
-  const barChartConfig = {
-    ...chartConfig,
-    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-  };
-
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -155,7 +346,7 @@ const AnalyticsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header Section - Similar to Dashboard */}
+      {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <Image 
@@ -291,17 +482,13 @@ const AnalyticsScreen = () => {
           </View>
 
           <View style={styles.chartContainer}>
-            <LineChart
+            {/* Replace LineChart with SimpleLineChart */}
+            <SimpleLineChart
               data={getChartData()}
-              width={screenWidth}
               height={220}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chart}
-              fromZero
+              color="#ed7b0e"
             />
           </View>
-
         </View>
 
         {/* Summary Cards */}
@@ -352,35 +539,21 @@ const AnalyticsScreen = () => {
         {/* Payment Methods Chart */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Payment Methods</Text>
-
           <View style={styles.pieChartCard}>
-            <PieChart
-              data={paymentMethodData}
-              width={screenWidth}
-              height={220}
-              chartConfig={chartConfig}
-              accessor={"population"}
-              backgroundColor={"transparent"}
-              paddingLeft={"15"}
-              center={[10, 0]}
-              absolute
-            />
+            {/* Replace PieChart with SimplePieChart */}
+            <SimplePieChart data={paymentMethodData} />
           </View>
         </View>
 
         {/* Transactions by Hour */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Transactions by Time of Day</Text>
-
           <View style={styles.barChartCard}>
-            <BarChart
+            {/* Replace BarChart with SimpleBarChart */}
+            <SimpleBarChart
               data={transactionsByHourData}
-              width={screenWidth}
               height={220}
-              chartConfig={barChartConfig}
-              style={styles.chart}
-              fromZero
-              showValuesOnTopOfBars
+              color="#000000"
             />
           </View>
         </View>
