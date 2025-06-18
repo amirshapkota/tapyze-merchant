@@ -1,19 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, SafeAreaView, Image, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import merchantAuthService from '../services/merchantAuthService';
 import styles from '../styles/ForgotPasswordScreenStyles';
 
-import { useNavigation } from '@react-navigation/native';
-
-
-const ForgotPasswordScreen = () => {
-
+const MerchantForgotPasswordScreen = () => {
   const navigation = useNavigation();
   
   // State variables
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState('email'); // 'email', 'verification', 'newPassword'
+  const [step, setStep] = useState('email');
   const [verificationCode, setVerificationCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,7 +25,7 @@ const ForgotPasswordScreen = () => {
     if (!password) return { score: 0, label: 'None', color: '#E0E0E0' };
     
     let score = 0;
-    if (password.length >= 8) score += 1;
+    if (password.length >= 6) score += 1;
     if (/[A-Z]/.test(password)) score += 1;
     if (/[a-z]/.test(password)) score += 1;
     if (/[0-9]/.test(password)) score += 1;
@@ -40,8 +38,15 @@ const ForgotPasswordScreen = () => {
   
   const passwordStrength = checkPasswordStrength(newPassword);
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup any running timers
+    };
+  }, []);
+
   // Handle submit email for password reset
-  const handleSubmitEmail = () => {
+  const handleSubmitEmail = async () => {
     // Basic email validation
     if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
       Alert.alert("Error", "Please enter a valid email address");
@@ -50,12 +55,30 @@ const ForgotPasswordScreen = () => {
     
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await merchantAuthService.apiCall('/auth/merchant/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+
+      if (response.status === 'success') {
+        Alert.alert(
+          "Code Sent",
+          response.message || "A verification code has been sent to your email",
+          [{ text: "OK", onPress: () => {
+            setStep('verification');
+            startResendTimer();
+          }}]
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        "Error", 
+        error.message || "Failed to send reset code. Please try again."
+      );
+    } finally {
       setIsLoading(false);
-      setStep('verification');
-      startResendTimer();
-    }, 1500);
+    }
   };
 
   // Start timer for resend code
@@ -76,44 +99,118 @@ const ForgotPasswordScreen = () => {
   };
 
   // Handle resend verification code
-  const handleResendCode = () => {
+  const handleResendCode = async () => {
     if (resendDisabled) return;
     
-    Alert.alert("Code Resent", "A new verification code has been sent to your email");
-    startResendTimer();
+    setIsLoading(true);
+    
+    try {
+      const response = await merchantAuthService.apiCall('/auth/merchant/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+
+      if (response.status === 'success') {
+        Alert.alert("Code Resent", "A new verification code has been sent to your email");
+        startResendTimer();
+      }
+    } catch (error) {
+      Alert.alert(
+        "Error", 
+        error.message || "Failed to resend code. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle verification code submit
-  const handleVerifyCode = () => {
-    if (!verificationCode.trim() || verificationCode.length < 4) {
-      Alert.alert("Error", "Please enter a valid verification code");
+  const handleVerifyCode = async () => {
+    if (!verificationCode.trim() || verificationCode.length !== 6) {
+      Alert.alert("Error", "Please enter the 6-digit verification code");
       return;
     }
     
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Verify the code with the backend using the dedicated endpoint
+      const response = await merchantAuthService.apiCall('/auth/merchant/verify-reset-code', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          code: verificationCode.trim()
+        }),
+      });
+
+      if (response.status === 'success') {
+        // Code is valid, move to password reset step
+        setStep('newPassword');
+      }
+    } catch (error) {
+      // Handle verification errors
+      if (error.message.includes('invalid') || 
+          error.message.includes('expired')) {
+        Alert.alert(
+          "Invalid Code",
+          "The verification code is invalid or has expired. Please check your email and try again, or request a new code.",
+          [
+            { text: "Try Again", style: "default" }
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Verification Failed", 
+          error.message || "Failed to verify code. Please try again."
+        );
+      }
+    } finally {
       setIsLoading(false);
-      setStep('newPassword');
-    }, 1500);
+    }
+  };
+      // Handle verification errors
+      if (error.message.includes('invalid') || 
+          error.message.includes('expired')) {
+        Alert.alert(
+          "Invalid Code",
+          "The verification code is invalid or has expired. Please check your email and try again, or request a new code.",
+          [
+            { text: "Try Again", style: "default" }
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Verification Failed", 
+          error.message || "Failed to verify code. Please try again."
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle set new password
-  const handleSetNewPassword = () => {
+  const handleSetNewPassword = async () => {
     // Validation
-    if (!newPassword) {
+    if (!newPassword.trim()) {
       Alert.alert("Error", "Please enter a new password");
       return;
     }
     
-    if (newPassword.length < 8) {
-      Alert.alert("Error", "Password must be at least 8 characters long");
+    if (newPassword.length < 6) {
+      Alert.alert("Error", "Password must be at least 6 characters long");
       return;
     }
     
-    if (passwordStrength.score < 3) {
-      Alert.alert("Weak Password", "Please create a stronger password with a mix of uppercase, lowercase, numbers, and special characters");
+    if (passwordStrength.score < 2) {
+      Alert.alert(
+        "Weak Password", 
+        "Please create a stronger password with a mix of uppercase, lowercase, numbers, and special characters"
+      );
+      return;
+    }
+    
+    if (!confirmPassword.trim()) {
+      Alert.alert("Error", "Please confirm your new password");
       return;
     }
     
@@ -124,16 +221,78 @@ const ForgotPasswordScreen = () => {
     
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const resetData = {
+        code: verificationCode.trim(),
+        password: newPassword.trim(),
+        confirmPassword: confirmPassword.trim()
+      };
+
+      const response = await merchantAuthService.apiCall('/auth/merchant/reset-password', {
+        method: 'POST',
+        body: JSON.stringify(resetData),
+      });
+
+      if (response.status === 'success') {
+        Alert.alert(
+          "Success",
+          response.message || "Your password has been reset successfully",
+          [{ 
+            text: "Login", 
+            onPress: () => {
+              navigation.navigate('Auth');
+            }
+          }]
+        );
+      }
+    } catch (error) {
+      if (error.message.includes('invalid') || 
+          error.message.includes('expired') || 
+          error.message.toLowerCase().includes('code')) {
+        Alert.alert(
+          "Session Expired",
+          "Your verification session has expired. Please start the password reset process again.",
+          [
+            {
+              text: "Start Over",
+              onPress: () => setStep('email')
+            }
+          ]
+        );
+      } else if (error.message.includes('password')) {
+        Alert.alert(
+          "Password Error", 
+          error.message || "Please check your password requirements and try again."
+        );
+      } else {
+        Alert.alert(
+          "Error", 
+          error.message || "Failed to reset password. Please try again."
+        );
+      }
+    } finally {
       setIsLoading(false);
-      
-      Alert.alert(
-        "Success",
-        "Your password has been reset successfully",
-        [{ text: "Continue", onPress: () => navigation.popToTop() }]
-      );
-    }, 1500);
+    }
+  };
+
+  // Validate form for current step
+  const isFormValid = () => {
+    switch (step) {
+      case 'email':
+        return email.trim() && /\S+@\S+\.\S+/.test(email);
+      case 'verification':
+        return verificationCode.trim().length === 6;
+      case 'newPassword':
+        return (
+          newPassword.trim() &&
+          confirmPassword.trim() &&
+          newPassword === confirmPassword &&
+          newPassword.length >= 6 &&
+          passwordStrength.score >= 2
+        );
+      default:
+        return false;
+    }
   };
 
   // Render the email input step
@@ -154,7 +313,7 @@ const ForgotPasswordScreen = () => {
       
       <View style={styles.formSection}>
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Email Address</Text>
+          <Text style={styles.inputLabel}>Email Address *</Text>
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
             <TextInput
@@ -165,16 +324,22 @@ const ForgotPasswordScreen = () => {
               placeholderTextColor="#999"
               keyboardType="email-address"
               autoCapitalize="none"
-              autoCompleteType="email"
+              autoComplete="email"
             />
           </View>
+          <Text style={styles.helperText}>
+            Enter the email address associated with your merchant account
+          </Text>
         </View>
       </View>
       
       <TouchableOpacity 
-        style={[styles.actionButton, isLoading && styles.actionButtonDisabled]}
+        style={[
+          styles.actionButton, 
+          (!isFormValid() || isLoading) && styles.actionButtonDisabled
+        ]}
         onPress={handleSubmitEmail}
-        disabled={isLoading}
+        disabled={!isFormValid() || isLoading}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFFFFF" size="small" />
@@ -187,7 +352,7 @@ const ForgotPasswordScreen = () => {
         style={styles.secondaryActionButton}
         onPress={() => navigation.goBack()}
       >
-        <Text style={styles.secondaryActionButtonText}>Go Back</Text>
+        <Text style={styles.secondaryActionButtonText}>Back to Login</Text>
       </TouchableOpacity>
     </>
   );
@@ -210,7 +375,7 @@ const ForgotPasswordScreen = () => {
       
       <View style={styles.formSection}>
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Verification Code</Text>
+          <Text style={styles.inputLabel}>Verification Code *</Text>
           <View style={styles.inputContainer}>
             <Ionicons name="key-outline" size={20} color="#666" style={styles.inputIcon} />
             <TextInput
@@ -223,25 +388,31 @@ const ForgotPasswordScreen = () => {
               maxLength={6}
             />
           </View>
+          <Text style={styles.helperText}>
+            Check your email for the verification code
+          </Text>
         </View>
       </View>
       
       <TouchableOpacity 
-        style={[styles.actionButton, isLoading && styles.actionButtonDisabled]}
+        style={[
+          styles.actionButton, 
+          (!isFormValid() || isLoading) && styles.actionButtonDisabled
+        ]}
         onPress={handleVerifyCode}
-        disabled={isLoading}
+        disabled={!isFormValid() || isLoading}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFFFFF" size="small" />
         ) : (
-          <Text style={styles.actionButtonText}>Verify Code</Text>
+          <Text style={styles.actionButtonText}>Continue</Text>
         )}
       </TouchableOpacity>
       
       <TouchableOpacity 
         style={[styles.secondaryActionButton, resendDisabled && styles.disabledLink]}
         onPress={handleResendCode}
-        disabled={resendDisabled}
+        disabled={resendDisabled || isLoading}
       >
         <Text style={[styles.secondaryActionButtonText, resendDisabled && styles.disabledText]}>
           {resendDisabled ? `Resend code in ${timer}s` : "Resend code"}
@@ -271,13 +442,13 @@ const ForgotPasswordScreen = () => {
       <View style={styles.titleSection}>
         <Text style={styles.screenTitle}>Reset Password</Text>
         <Text style={styles.screenSubtitle}>
-          Create a new strong password for your account
+          Create a new strong password for your merchant account
         </Text>
       </View>
       
       <View style={styles.formSection}>
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>New Password</Text>
+          <Text style={styles.inputLabel}>New Password *</Text>
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
             <TextInput
@@ -287,6 +458,7 @@ const ForgotPasswordScreen = () => {
               placeholder="Enter your new password"
               placeholderTextColor="#999"
               secureTextEntry={!showNewPassword}
+              autoCapitalize="none"
             />
             <TouchableOpacity 
               onPress={() => setShowNewPassword(!showNewPassword)}
@@ -318,12 +490,12 @@ const ForgotPasswordScreen = () => {
           ) : null}
           
           <Text style={styles.helperText}>
-            Use at least 8 characters with a mix of uppercase, lowercase, numbers, and special characters
+            Use at least 6 characters with a mix of uppercase, lowercase, numbers, and special characters
           </Text>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Confirm New Password</Text>
+          <Text style={styles.inputLabel}>Confirm New Password *</Text>
           <View style={styles.inputContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
             <TextInput
@@ -333,6 +505,7 @@ const ForgotPasswordScreen = () => {
               placeholder="Confirm your new password"
               placeholderTextColor="#999"
               secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
             />
             <TouchableOpacity 
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -348,13 +521,19 @@ const ForgotPasswordScreen = () => {
           {confirmPassword && newPassword && confirmPassword !== newPassword && (
             <Text style={styles.errorText}>Passwords don't match</Text>
           )}
+          {confirmPassword && newPassword && confirmPassword === newPassword && (
+            <Text style={styles.successText}>✓ Passwords match</Text>
+          )}
         </View>
       </View>
       
       <TouchableOpacity 
-        style={[styles.actionButton, isLoading && styles.actionButtonDisabled]}
+        style={[
+          styles.actionButton, 
+          (!isFormValid() || isLoading) && styles.actionButtonDisabled
+        ]}
         onPress={handleSetNewPassword}
-        disabled={isLoading}
+        disabled={!isFormValid() || isLoading}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFFFFF" size="small" />
@@ -362,6 +541,9 @@ const ForgotPasswordScreen = () => {
           <Text style={styles.actionButtonText}>Reset Password</Text>
         )}
       </TouchableOpacity>
+
+      {/* Required fields note */}
+      <Text style={styles.requiredNote}>* Required fields</Text>
     </>
   );
 
@@ -409,4 +591,4 @@ const ForgotPasswordScreen = () => {
   );
 };
 
-export default ForgotPasswordScreen;
+export default MerchantForgotPasswordScreen;
