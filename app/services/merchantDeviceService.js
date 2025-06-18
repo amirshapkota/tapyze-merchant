@@ -5,29 +5,53 @@ const BASE_URL = 'https://tapyze.onrender.com/api';
 class MerchantDeviceService {
   constructor() {
     this.token = null;
+    this.currentUserId = null; // Track current user ID
   }
 
-  // Get auth token
+  // Get auth token with user validation
   async getToken() {
-    if (this.token) return this.token;
-    
     try {
       const token = await AsyncStorage.getItem('merchantToken');
-      if (token) {
+      const userData = await AsyncStorage.getItem('merchantData');
+      
+      if (token && userData) {
+        const user = JSON.parse(userData);
+        
+        // If user changed, clear cached token
+        if (this.currentUserId && this.currentUserId !== user._id) {
+          console.log('DeviceService: User changed, clearing cached token');
+          this.token = null;
+          this.currentUserId = null;
+        }
+        
         this.token = token;
+        this.currentUserId = user._id;
         return token;
       }
+      
+      // Clear if no token
+      this.token = null;
+      this.currentUserId = null;
       return null;
     } catch (error) {
       console.error('Error getting token:', error);
+      this.token = null;
+      this.currentUserId = null;
       return null;
     }
+  }
+
+  // Clear service cache (call this on logout)
+  clearCache() {
+    console.log('DeviceService: Clearing cache');
+    this.token = null;
+    this.currentUserId = null;
   }
 
   // Helper method to make API calls
   async apiCall(endpoint, options = {}) {
     const url = `${BASE_URL}${endpoint}`;
-    const token = await this.getToken();
+    const token = await this.getToken(); // Always get fresh token
     
     const config = {
       headers: {
@@ -43,6 +67,7 @@ class MerchantDeviceService {
     }
 
     try {
+      console.log('DeviceService API Call:', endpoint, 'for user:', this.currentUserId);
       const response = await fetch(url, config);
       const data = await response.json();
 

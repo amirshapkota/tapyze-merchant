@@ -6,33 +6,57 @@ const BASE_URL = 'https://tapyze.onrender.com/api';
 class PaymentService {
   constructor() {
     this.token = null;
+    this.currentUserId = null; // Track current user ID
     this.CURRENCY = 'Rs.';
     this.MIN_AMOUNT = 0;
     this.PIN_LENGTH = 4;
     this.MAX_TRANSACTION_TIMEOUT = 30000;
   }
 
-  // Get auth token
+  // Get auth token with user validation
   async getToken() {
-    if (this.token) return this.token;
-    
     try {
       const token = await AsyncStorage.getItem('merchantToken');
-      if (token) {
+      const userData = await AsyncStorage.getItem('merchantData');
+      
+      if (token && userData) {
+        const user = JSON.parse(userData);
+        
+        // If user changed, clear cached token
+        if (this.currentUserId && this.currentUserId !== user._id) {
+          console.log('PaymentService: User changed, clearing cached token');
+          this.token = null;
+          this.currentUserId = null;
+        }
+        
         this.token = token;
+        this.currentUserId = user._id;
         return token;
       }
+      
+      // Clear if no token
+      this.token = null;
+      this.currentUserId = null;
       return null;
     } catch (error) {
       console.error('Error getting token:', error);
+      this.token = null;
+      this.currentUserId = null;
       return null;
     }
+  }
+
+  // Clear service cache (call this on logout)
+  clearCache() {
+    console.log('PaymentService: Clearing cache');
+    this.token = null;
+    this.currentUserId = null;
   }
 
   // Helper method to make API calls
   async apiCall(endpoint, options = {}) {
     const url = `${BASE_URL}${endpoint}`;
-    const token = await this.getToken();
+    const token = await this.getToken(); // Always get fresh token
     
     const config = {
       headers: {
@@ -48,6 +72,7 @@ class PaymentService {
     }
 
     try {
+      console.log('PaymentService API Call:', endpoint, 'for user:', this.currentUserId);
       const response = await fetch(url, config);
       const data = await response.json();
 
@@ -69,7 +94,7 @@ class PaymentService {
    */
   async verifyCard(cardUid) {
     try {
-      console.log('Verifying card:', cardUid);
+      console.log('PaymentService: Verifying card:', cardUid, 'for user:', this.currentUserId);
       
       if (!cardUid || typeof cardUid !== 'string' || cardUid.trim().length === 0) {
         return {
@@ -138,6 +163,7 @@ class PaymentService {
       console.log('Card UID:', cardUid);
       console.log('Amount:', amount);
       console.log('PIN length:', pin?.length);
+      console.log('For user:', this.currentUserId);
 
       // Validate payment data
       const validation = this.validatePaymentData(paymentData);
@@ -173,6 +199,7 @@ class PaymentService {
       });
 
       if (response.status === 'success') {
+        console.log('Payment processed successfully for user:', this.currentUserId);
         return {
           success: true,
           data: {
@@ -203,6 +230,8 @@ class PaymentService {
    */
   async checkCardBalance(cardUid, pin) {
     try {
+      console.log('PaymentService: Checking balance for user:', this.currentUserId);
+      
       const response = await this.apiCall('/payments/rfid/balance', {
         method: 'POST',
         body: JSON.stringify({ cardUid, pin })
@@ -278,6 +307,8 @@ class PaymentService {
    */
   async refundPayment(transactionId, reason = null) {
     try {
+      console.log('PaymentService: Processing refund for user:', this.currentUserId);
+      
       const response = await this.apiCall(`/payments/rfid/refund/${transactionId}`, {
         method: 'POST',
         body: JSON.stringify({ reason })

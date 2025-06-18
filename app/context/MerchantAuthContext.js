@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useEffect, useReducer } from 'react';
 import merchantAuthService from '../services/merchantAuthService';
+import merchantWalletService from '../services/merchantWalletService';
+import paymentService from '../services/merchantPaymentService';
+import merchantDeviceService from '../services/merchantDeviceService';
 
 // Initial state
 const initialState = {
@@ -76,6 +79,18 @@ const MerchantAuthContext = createContext();
 export const MerchantAuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // Helper function to clear all service caches
+  const clearAllServiceCaches = () => {
+    console.log('Clearing all service caches...');
+    try {
+      merchantWalletService.clearCache?.();
+      paymentService.clearCache?.();
+      merchantDeviceService.clearCache?.();
+    } catch (error) {
+      console.error('Error clearing service caches:', error);
+    }
+  };
+
   // Check if merchant is already authenticated on app start
   useEffect(() => {
     checkAuthState();
@@ -91,15 +106,20 @@ export const MerchantAuthProvider = ({ children }) => {
         const user = await merchantAuthService.getCurrentUser();
         const token = await merchantAuthService.getToken();
         
+        console.log('Auth check: Found authenticated user:', user?._id);
+        
         dispatch({
           type: AUTH_ACTION_TYPES.LOGIN_SUCCESS,
           payload: { user, token }
         });
       } else {
+        console.log('Auth check: No authenticated user found');
+        clearAllServiceCaches();
         dispatch({ type: AUTH_ACTION_TYPES.SET_LOADING, payload: false });
       }
     } catch (error) {
       console.error('Error checking auth state:', error);
+      clearAllServiceCaches();
       dispatch({ type: AUTH_ACTION_TYPES.SET_ERROR, payload: error.message });
     }
   };
@@ -113,6 +133,11 @@ export const MerchantAuthProvider = ({ children }) => {
       const result = await merchantAuthService.merchantLogin(credentials);
 
       if (result.success) {
+        console.log('Login successful for user:', result.user._id);
+        
+        // Clear all service caches before setting new user
+        clearAllServiceCaches();
+        
         dispatch({
           type: AUTH_ACTION_TYPES.LOGIN_SUCCESS,
           payload: {
@@ -140,6 +165,11 @@ export const MerchantAuthProvider = ({ children }) => {
       const result = await merchantAuthService.merchantSignup(userData);
 
       if (result.success) {
+        console.log('Signup successful for user:', result.user._id);
+        
+        // Clear all service caches before setting new user
+        clearAllServiceCaches();
+        
         dispatch({
           type: AUTH_ACTION_TYPES.LOGIN_SUCCESS,
           payload: {
@@ -161,11 +191,21 @@ export const MerchantAuthProvider = ({ children }) => {
   // Logout function
   const logout = async () => {
     try {
+      console.log('Logging out user:', state.user?._id);
+      
+      // Clear all service caches first
+      clearAllServiceCaches();
+      
       await merchantAuthService.logout();
       dispatch({ type: AUTH_ACTION_TYPES.LOGOUT });
+      
+      console.log('Logout completed');
       return { success: true };
     } catch (error) {
       console.error('Logout error:', error);
+      // Still clear everything even if logout fails
+      clearAllServiceCaches();
+      dispatch({ type: AUTH_ACTION_TYPES.LOGOUT });
       return { success: false, message: error.message };
     }
   };
@@ -175,6 +215,7 @@ export const MerchantAuthProvider = ({ children }) => {
     try {
       const result = await merchantAuthService.updateUserData(userData);
       if (result.success) {
+        console.log('User updated:', userData._id);
         dispatch({ type: AUTH_ACTION_TYPES.UPDATE_USER, payload: userData });
       }
       return result;

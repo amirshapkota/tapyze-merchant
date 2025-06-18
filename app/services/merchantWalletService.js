@@ -5,29 +5,53 @@ const BASE_URL = 'https://tapyze.onrender.com/api';
 class MerchantWalletService {
   constructor() {
     this.token = null;
+    this.currentUserId = null; // Track current user ID
   }
 
-  // Get auth token
+  // Get auth token with user validation
   async getToken() {
-    if (this.token) return this.token;
-    
     try {
       const token = await AsyncStorage.getItem('merchantToken');
-      if (token) {
+      const userData = await AsyncStorage.getItem('merchantData');
+      
+      if (token && userData) {
+        const user = JSON.parse(userData);
+        
+        // If user changed, clear cached token
+        if (this.currentUserId && this.currentUserId !== user._id) {
+          console.log('WalletService: User changed, clearing cached token');
+          this.token = null;
+          this.currentUserId = null;
+        }
+        
         this.token = token;
+        this.currentUserId = user._id;
         return token;
       }
+      
+      // Clear if no token
+      this.token = null;
+      this.currentUserId = null;
       return null;
     } catch (error) {
       console.error('Error getting token:', error);
+      this.token = null;
+      this.currentUserId = null;
       return null;
     }
+  }
+
+  // Clear service cache (call this on logout)
+  clearCache() {
+    console.log('WalletService: Clearing cache');
+    this.token = null;
+    this.currentUserId = null;
   }
 
   // Helper method to make API calls
   async apiCall(endpoint, options = {}) {
     const url = `${BASE_URL}${endpoint}`;
-    const token = await this.getToken();
+    const token = await this.getToken(); // Always get fresh token
     
     const config = {
       headers: {
@@ -43,6 +67,7 @@ class MerchantWalletService {
     }
 
     try {
+      console.log('WalletService API Call:', endpoint, 'for user:', this.currentUserId);
       const response = await fetch(url, config);
       const data = await response.json();
 
@@ -197,6 +222,8 @@ class MerchantWalletService {
   // Get dashboard statistics
   async getDashboardStats() {
     try {
+      console.log('WalletService: Loading dashboard stats for user:', this.currentUserId);
+      
       const [balanceResult, transactionsResult] = await Promise.all([
         this.getWalletBalance(),
         this.getTransactionHistory(1, 50) // Get more transactions for stats
@@ -238,6 +265,8 @@ class MerchantWalletService {
         .slice(0, 10) // Show latest 10
         .map(t => this.formatTransactionForDisplay(t));
 
+      console.log('WalletService: Dashboard stats loaded successfully for user:', this.currentUserId);
+
       return {
         success: true,
         data: {
@@ -266,6 +295,7 @@ class MerchantWalletService {
         }
       };
     } catch (error) {
+      console.error('WalletService: Dashboard stats error for user:', this.currentUserId, error);
       return {
         success: false,
         message: error.message || 'Failed to load dashboard data'
