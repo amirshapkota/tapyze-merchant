@@ -5,7 +5,7 @@ import { useMerchantAuth } from '../context/MerchantAuthContext';
 import merchantAuthService from '../services/merchantAuthService';
 import styles from '../styles/ChangePasswordScreenStyles';
 
-const MerchantChangePasswordScreen = ({ navigation }) => {
+const ChangePasswordScreen = ({ navigation }) => {
   const { user, logout } = useMerchantAuth();
   
   // State for password fields
@@ -367,4 +367,4 @@ const MerchantChangePasswordScreen = ({ navigation }) => {
   );
 };
 
-export default MerchantChangePasswordScreen;
+export default ChangePasswordScreen;

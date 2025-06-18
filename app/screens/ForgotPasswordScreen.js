@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import merchantAuthService from '../services/merchantAuthService';
 import styles from '../styles/ForgotPasswordScreenStyles';
 
-const MerchantForgotPasswordScreen = () => {
+const ForgotPasswordScreen = () => {
   const navigation = useNavigation();
   
   // State variables
@@ -147,26 +147,6 @@ const MerchantForgotPasswordScreen = () => {
         setStep('newPassword');
       }
     } catch (error) {
-      // Handle verification errors
-      if (error.message.includes('invalid') || 
-          error.message.includes('expired')) {
-        Alert.alert(
-          "Invalid Code",
-          "The verification code is invalid or has expired. Please check your email and try again, or request a new code.",
-          [
-            { text: "Try Again", style: "default" }
-          ]
-        );
-      } else {
-        Alert.alert(
-          "Verification Failed", 
-          error.message || "Failed to verify code. Please try again."
-        );
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
       // Handle verification errors
       if (error.message.includes('invalid') || 
           error.message.includes('expired')) {
@@ -591,4 +571,4 @@ const MerchantForgotPasswordScreen = () => {
   );
 };
 
-export default MerchantForgotPasswordScreen;
+export default ForgotPasswordScreen;
