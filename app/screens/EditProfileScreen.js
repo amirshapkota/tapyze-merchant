@@ -1,87 +1,134 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, SafeAreaView, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useMerchantAuth } from '../context/MerchantAuthContext';
+import merchantAuthService from '../services/merchantAuthService';
 import styles from '../styles/EditProfileScreenStyles';
 
-const MerchantEditProfileScreen = ({ navigation, route }) => {
-  // Get merchant profile data from route or use default
-  const initialMerchantProfile = route?.params?.merchantProfile || {
-    businessName: "Coffee Shop",
-    ownerName: "John Smith",
-    email: "john@coffeeshop.com",
-    phone: "+977 9801234567",
-    address: "Thamel, Kathmandu",
-    businessType: "Cafe & Restaurant",
-    memberSince: 'April 2023',
-    merchantID: 'TPZ-78245'
+const MerchantEditProfileScreen = ({ navigation }) => {
+  const { user, updateUser, token } = useMerchantAuth();
+  
+  // State for form fields
+  const [businessName, setBusinessName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  const [businessType, setBusinessType] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Initialize form with user data
+  useEffect(() => {
+    if (user) {
+      setBusinessName(user.businessName || '');
+      setOwnerName(user.ownerName || '');
+      setEmail(user.email || '');
+      setPhone(user.phone || '');
+      setBusinessAddress(user.businessAddress || '');
+      setBusinessType(user.businessType || '');
+    }
+  }, [user]);
+
+  // Check if there are changes
+  useEffect(() => {
+    if (user) {
+      const changes = (
+        businessName !== (user.businessName || '') ||
+        ownerName !== (user.ownerName || '') ||
+        phone !== (user.phone || '') ||
+        businessAddress !== (user.businessAddress || '') ||
+        businessType !== (user.businessType || '')
+      );
+      setHasChanges(changes);
+    }
+  }, [businessName, ownerName, phone, businessAddress, businessType, user]);
+
+  // Validate form inputs
+  const validateInputs = () => {
+    if (!businessName.trim()) {
+      Alert.alert("Error", "Business name cannot be empty");
+      return false;
+    }
+    
+    if (!ownerName.trim()) {
+      Alert.alert("Error", "Owner name cannot be empty");
+      return false;
+    }
+    
+    if (!phone.trim()) {
+      Alert.alert("Error", "Phone number cannot be empty");
+      return false;
+    }
+
+    // Validate phone number format (basic validation)
+    const phoneRegex = /^[0-9]{10,15}$/;
+    const cleanPhone = phone.replace(/[\s\-\+\(\)]/g, '');
+    if (!phoneRegex.test(cleanPhone)) {
+      Alert.alert("Error", "Please enter a valid phone number (10-15 digits)");
+      return false;
+    }
+
+    if (!businessAddress.trim()) {
+      Alert.alert("Error", "Business address cannot be empty");
+      return false;
+    }
+    
+    if (!businessType.trim()) {
+      Alert.alert("Error", "Business type cannot be empty");
+      return false;
+    }
+    
+    return true;
   };
 
-  // State for form fields
-  const [businessName, setBusinessName] = useState(initialMerchantProfile.businessName);
-  const [ownerName, setOwnerName] = useState(initialMerchantProfile.ownerName);
-  const [email, setEmail] = useState(initialMerchantProfile.email);
-  const [phone, setPhone] = useState(initialMerchantProfile.phone);
-  const [address, setAddress] = useState(initialMerchantProfile.address);
-  const [businessType, setBusinessType] = useState(initialMerchantProfile.businessType);
-  const [isLoading, setIsLoading] = useState(false);
-
   // Handle save changes
-  const handleSaveChanges = () => {
-    // Validate inputs
-    if (!businessName?.trim()) {
-      Alert.alert("Error", "Business name cannot be empty");
+  const handleSaveChanges = async () => {
+    if (!validateInputs()) {
       return;
     }
     
-    if (!ownerName?.trim()) {
-      Alert.alert("Error", "Owner name cannot be empty");
-      return;
-    }
-    
-    if (!email?.trim() || !/\S+@\S+\.\S+/.test(email)) {
-      Alert.alert("Error", "Please enter a valid email address");
-      return;
-    }
-    
-    if (!phone?.trim()) {
-      Alert.alert("Error", "Phone number cannot be empty");
-      return;
-    }
-    
-    if (!address?.trim()) {
-      Alert.alert("Error", "Business address cannot be empty");
-      return;
-    }
-    
-    if (!businessType?.trim()) {
-      Alert.alert("Error", "Business type cannot be empty");
-      return;
-    }
-    
-    // Show loading
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      // Update profile in real app would happen here
+    try {
+      // Prepare update data (only editable fields)
+      const updateData = {
+        businessName: businessName.trim(),
+        ownerName: ownerName.trim(),
+        phone: phone.trim(),
+        businessAddress: businessAddress.trim(),
+        businessType: businessType.trim()
+      };
+
+      const response = await merchantAuthService.apiCall('/auth/merchant/profile', {
+        method: 'PATCH',
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.status === 'success') {
+        // Update user data in context
+        const updatedUser = { ...user, ...updateData };
+        await updateUser(updatedUser);
+        
+        Alert.alert(
+          "Success",
+          response.message || "Profile updated successfully",
+          [{ text: "OK", onPress: () => navigation.goBack() }]
+        );
+      }
+    } catch (error) {
       Alert.alert(
-        "Success",
-        "Business profile updated successfully",
-        [{ text: "OK", onPress: () => navigation.goBack() }]
+        "Error", 
+        error.message || "Failed to update profile. Please try again."
       );
-    }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle go back
   const handleGoBack = () => {
-    if (businessName !== initialMerchantProfile.businessName || 
-        ownerName !== initialMerchantProfile.ownerName ||
-        email !== initialMerchantProfile.email || 
-        phone !== initialMerchantProfile.phone ||
-        address !== initialMerchantProfile.address ||
-        businessType !== initialMerchantProfile.businessType) {
+    if (hasChanges) {
       Alert.alert(
         "Discard Changes",
         "You have unsaved changes. Are you sure you want to go back?",
@@ -93,6 +140,18 @@ const MerchantEditProfileScreen = ({ navigation, route }) => {
     } else {
       navigation.goBack();
     }
+  };
+
+  // Format member since date
+  const formatMemberSince = () => {
+    if (user?.createdAt) {
+      const date = new Date(user.createdAt);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long' 
+      });
+    }
+    return 'Unknown';
   };
 
   return (
@@ -139,7 +198,7 @@ const MerchantEditProfileScreen = ({ navigation, route }) => {
           {/* Form Section */}
           <View style={styles.formSection}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Business Name</Text>
+              <Text style={styles.inputLabel}>Business Name *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="business-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
@@ -153,7 +212,7 @@ const MerchantEditProfileScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Owner Name</Text>
+              <Text style={styles.inputLabel}>Owner Name *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
@@ -168,22 +227,15 @@ const MerchantEditProfileScreen = ({ navigation, route }) => {
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Email Address</Text>
-              <View style={styles.inputContainer}>
+              <View style={styles.disabledInputContainer}>
                 <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="Enter your email address"
-                  placeholderTextColor="#999"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
+                <Text style={styles.disabledText}>{email}</Text>
               </View>
+              <Text style={styles.helperText}>Email cannot be changed</Text>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Phone Number</Text>
+              <Text style={styles.inputLabel}>Phone Number *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
@@ -198,13 +250,13 @@ const MerchantEditProfileScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Business Address</Text>
+              <Text style={styles.inputLabel}>Business Address *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="location-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
                   style={styles.textInput}
-                  value={address}
-                  onChangeText={setAddress}
+                  value={businessAddress}
+                  onChangeText={setBusinessAddress}
                   placeholder="Enter business address"
                   placeholderTextColor="#999"
                 />
@@ -212,7 +264,7 @@ const MerchantEditProfileScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Business Type</Text>
+              <Text style={styles.inputLabel}>Business Type *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="pricetag-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
@@ -226,19 +278,10 @@ const MerchantEditProfileScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Merchant ID</Text>
-              <View style={styles.disabledInputContainer}>
-                <Ionicons name="id-card-outline" size={20} color="#666" style={styles.inputIcon} />
-                <Text style={styles.disabledText}>{initialMerchantProfile.merchantID}</Text>
-              </View>
-              <Text style={styles.helperText}>This field cannot be changed</Text>
-            </View>
-
-            <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Member Since</Text>
               <View style={styles.disabledInputContainer}>
                 <Ionicons name="calendar-outline" size={20} color="#666" style={styles.inputIcon} />
-                <Text style={styles.disabledText}>{initialMerchantProfile.memberSince}</Text>
+                <Text style={styles.disabledText}>{formatMemberSince()}</Text>
               </View>
               <Text style={styles.helperText}>This field cannot be changed</Text>
             </View>
@@ -248,17 +291,22 @@ const MerchantEditProfileScreen = ({ navigation, route }) => {
           <TouchableOpacity 
             style={[
               styles.saveButton,
-              isLoading ? styles.saveButtonDisabled : {}
+              (isLoading || !hasChanges) ? styles.saveButtonDisabled : {}
             ]}
             onPress={handleSaveChanges}
-            disabled={isLoading}
+            disabled={isLoading || !hasChanges}
           >
             {isLoading ? (
               <Text style={styles.saveButtonText}>Updating...</Text>
             ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={styles.saveButtonText}>
+                {hasChanges ? 'Save Changes' : 'No Changes to Save'}
+              </Text>
             )}
           </TouchableOpacity>
+
+          {/* Required fields note */}
+          <Text style={styles.requiredNote}>* Required fields</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
