@@ -43,8 +43,8 @@ class MerchantAuthService {
       ...options,
     };
 
-    // Add auth token if available and not a login/signup request
-    if (this.token && !endpoint.includes('/auth/')) {
+    // Add auth token if available (like customer auth service)
+    if (this.token) {
       config.headers.Authorization = `Bearer ${this.token}`;
       console.log('Making authenticated API call to:', endpoint);
     }

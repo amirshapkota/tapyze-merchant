@@ -167,6 +167,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  requiredNote: {
+    fontSize: 12,
+    color: '#666666',
+    textAlign: 'center',
+    marginTop: 16,
+    fontStyle: 'italic',
+  },
 });
 
 export default styles;

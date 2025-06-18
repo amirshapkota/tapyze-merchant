@@ -201,11 +201,24 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginLeft: 2,
   },
+  successText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    marginTop: 8,
+    marginLeft: 2,
+  },
   disabledLink: {
     opacity: 0.7,
   },
   disabledText: {
     color: '#999',
+  },
+  requiredNote: {
+    fontSize: 12,
+    color: '#666666',
+    textAlign: 'center',
+    marginTop: 16,
+    fontStyle: 'italic',
   },
 });
 
