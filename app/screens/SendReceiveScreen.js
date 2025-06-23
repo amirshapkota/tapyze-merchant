@@ -13,7 +13,8 @@ import {
   StyleSheet 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import QRCode from 'react-native-qrcode-svg';
+// Replace QRCode import with SimpleQRCode
+import PaymentQrCode from '../components/PaymentQrCode'; // Adjust path as needed
 import { Camera, CameraView } from 'expo-camera';
 import { useMerchantAuth } from '../context/MerchantAuthContext'; // Adjust path as needed
 import merchantWalletService from '../services/merchantWalletService';
@@ -577,17 +578,13 @@ const MerchantSendReceiveScreen = ({ navigation }) => {
         </Text>
         
         <View style={styles.qrCodeWrapper}>
-          <QRCode
+          {/* Updated QR Code component */}
+          <PaymentQrCode
             value={generateQRData()}
             size={220}
-            color="#000000"
-            backgroundColor="#FFFFFF"
             logo={require('../assets/logo.png')}
             logoSize={44}
-            logoBackgroundColor="transparent"
-            logoMargin={4}
-            logoBorderRadius={12}
-            enableLinearGradient={false}
+            logoBackgroundColor="#FFFFFF"
           />
         </View>
         
