@@ -1,65 +1,66 @@
 import React from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 
-const PaymentQrCode = ({ 
-  value, 
-  size = 220, 
-  logo = null, 
-  logoSize = 44,
-  logoBackgroundColor = '#FFFFFF' 
+const PaymentQrCode = ({
+  value,
+  size = 220,
+  logo = null,
+  logoSize = 64, // Increased from 48
+  logoBackgroundColor = '#fff'
 }) => {
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&format=png&margin=10`;
-  
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&format=png&margin=0`;
+
   return (
-    <View style={[styles.container, { width: size + 20, height: size + 20 }]}>
-      <Image
-        source={{ uri: qrUrl }}
-        style={{ width: size, height: size }}
-        resizeMode="contain"
-      />
-      {/* Logo overlay - only show if logo is provided */}
-      {logo && (
-        <View style={[
-          styles.logoContainer, 
-          { 
-            width: logoSize, 
-            height: logoSize, 
-            borderRadius: logoSize / 2,
-            backgroundColor: logoBackgroundColor 
-          }
-        ]}>
-          <Image
-            source={logo}
-            style={[styles.logoImage, { width: logoSize - 12, height: logoSize - 12 }]}
-            resizeMode="contain"
-          />
-        </View>
-      )}
+    <View style={{ width: size, height: size }}>
+      <View style={[styles.qrContainer, { width: size, height: size }]}>
+        <Image
+          source={{ uri: qrUrl }}
+          style={styles.qrImage}
+          resizeMode="contain"
+        />
+        {logo && (
+          <View style={[
+            styles.logoContainer,
+            {
+              width: logoSize,
+              height: logoSize,
+              borderRadius: logoSize / 2,
+              backgroundColor: logoBackgroundColor,
+              left: size / 2 - logoSize / 2,
+              top: size / 2 - logoSize / 2,
+            }
+          ]}>
+            <Image
+              source={logo}
+              style={{
+                width: logoSize * 0.85, // Slightly larger content ratio
+                height: logoSize * 0.85,
+                borderRadius: (logoSize * 0.85) / 2,
+              }}
+              resizeMode="contain"
+            />
+          </View>
+        )}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  qrContainer: {
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 10,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+  },
+  qrImage: {
+    width: '100%',
+    height: '100%',
   },
   logoContainer: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
-  },
-  logoImage: {
-    borderRadius: 16,
   },
 });
 
