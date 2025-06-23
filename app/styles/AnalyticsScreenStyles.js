@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   productRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
@@ -421,6 +421,216 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
+  recentActivityCard: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 16,
+  marginHorizontal: 20,
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 3,
+  },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 5,
+},
+
+activityItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingVertical: 15,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F0F0F0',
+},
+
+activityIcon: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: '#F8F9FA',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 12,
+},
+
+activityDetails: {
+  flex: 1,
+},
+
+activityTitle: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#000000',
+  marginBottom: 2,
+},
+
+activityTime: {
+  fontSize: 12,
+  color: '#666',
+},
+
+activityAmount: {
+  fontSize: 14,
+  fontWeight: 'bold',
+},
+
+// Performance Tips Styles
+tipsCard: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 16,
+  paddingHorizontal: 20,
+  paddingVertical: 15,
+  marginHorizontal: 20,
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 3,
+  },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 5,
+},
+
+tipItem: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  marginBottom: 15,
+},
+
+tipText: {
+  flex: 1,
+  fontSize: 14,
+  color: '#333',
+  lineHeight: 20,
+  marginLeft: 12,
+},
+
+// Device Statistics (Scanner only) Styles
+deviceStatsContainer: {
+  flexDirection: 'row',
+  paddingHorizontal: 20,
+  marginBottom: 20,
+  justifyContent: 'center', // Since we only have scanners now
+},
+
+deviceStatCard: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 12,
+  padding: 16,
+  alignItems: 'center',
+  minWidth: 120,
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.1,
+  shadowRadius: 3,
+  elevation: 3,
+},
+
+deviceStatIcon: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  backgroundColor: '#007bff',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 12,
+},
+
+deviceStatValue: {
+  fontSize: 24,
+  fontWeight: 'bold',
+  color: '#000000',
+  marginBottom: 4,
+},
+
+deviceStatLabel: {
+  fontSize: 12,
+  color: '#666',
+  textAlign: 'center',
+  fontWeight: '500',
+},
+
+// Error State Styles
+errorContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: 20,
+},
+
+errorTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  marginTop: 10,
+  textAlign: 'center',
+  color: '#000',
+},
+
+errorMessage: {
+  fontSize: 14,
+  color: '#666',
+  marginTop: 5,
+  textAlign: 'center',
+},
+
+retryButton: {
+  backgroundColor: '#ed7b0e',
+  paddingHorizontal: 20,
+  paddingVertical: 10,
+  borderRadius: 8,
+  marginTop: 20,
+},
+
+retryButtonText: {
+  color: '#fff',
+  fontWeight: 'bold',
+  fontSize: 14,
+},
+
+// Enhanced Chart Container
+chartContainerEnhanced: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 12,
+  overflow: 'hidden',
+},
+
+// No Data State
+noDataContainer: {
+  padding: 20,
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: 120,
+},
+
+noDataText: {
+  color: '#999',
+  fontSize: 14,
+  textAlign: 'center',
+  marginTop: 10,
+},
+
+noDataSubtext: {
+  color: '#666',
+  fontSize: 12,
+  marginTop: 5,
+  textAlign: 'center',
+  lineHeight: 16,
+},
+
+// Insights Enhancement
+insightIcon: {
+  marginRight: 10,
+},
+
+// Currency Display
+currencyText: {
+  fontWeight: '600',
+  color: '#ed7b0e',
+},
 });
 
 export default styles;
