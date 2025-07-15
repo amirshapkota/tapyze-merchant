@@ -275,48 +275,117 @@ class MerchantWalletService {
   }
 
   // Helper method to format transaction for merchant display
-  formatTransactionForDisplay(transaction) {
-    const isCredit = transaction.type === 'CREDIT' || transaction.amount > 0;
+  // Helper method to format transaction for merchant display
+formatTransactionForDisplay(transaction) {
+  const isCredit = transaction.type === 'CREDIT' || transaction.amount > 0;
+  
+  let title = 'Transaction';
+  let customerName = 'Unknown';
+  let method = 'TAPYZE';
+  
+  // Extract customer information based on your backend structure
+  if (transaction.metadata) {
+    // For RFID/Card payments (from payment controller)
+    if (transaction.metadata.paymentType === 'RFID_TAP') {
+      title = isCredit ? 'Card Payment Received' : 'Card Payment';
+      method = 'TAPYZE Card';
+      
+      if (isCredit && transaction.metadata.customer) {
+        // This is a merchant receiving payment - customer info is in metadata.customer
+        customerName = transaction.metadata.customer.name || 'Card Holder';
+      } else if (!isCredit && transaction.metadata.merchant) {
+        // This would be customer view - merchant info in metadata.merchant
+        customerName = transaction.metadata.merchant.name || 'Merchant';
+      }
+    }
     
-    let title = 'Transaction';
-    let customerName = 'Unknown';
-    let method = 'TAPYZE';
-    
-    // Determine transaction type and details for merchant
-    if (transaction.metadata?.transferType === 'INCOMING') {
+    // For wallet transfers (from wallet controller)
+    else if (transaction.metadata.transferType === 'INCOMING') {
       title = 'Payment Received';
-      customerName = transaction.metadata.sender?.name || 'Customer';
       method = 'TAPYZE Transfer';
-    } else if (transaction.metadata?.transferType === 'OUTGOING') {
+      
+      if (transaction.metadata.sender) {
+        customerName = transaction.metadata.sender.name || 'Transfer Sender';
+      }
+    } 
+    else if (transaction.metadata.transferType === 'OUTGOING') {
       title = 'Payment Sent';
-      customerName = transaction.metadata.recipient?.name || 'Recipient';
       method = 'TAPYZE Transfer';
-    } else if (transaction.description?.includes('top-up')) {
+      
+      if (transaction.metadata.recipient) {
+        customerName = transaction.metadata.recipient.name || 'Transfer Recipient';
+      }
+    }
+    
+    // For direct top-ups
+    else if (transaction.metadata.method === 'DIRECT') {
       title = 'Wallet Top-up';
       customerName = 'Self';
       method = 'Direct Deposit';
-    } else if (transaction.description?.includes('tap')) {
-      title = 'Tap Payment';
-      method = 'TAPYZE Card';
-    } else if (transaction.description?.includes('qr')) {
-      title = 'QR Code Payment';
-      method = 'TAPYZE App';
     }
-
-    return {
-      id: transaction._id,
-      type: isCredit ? 'receive' : 'refund',
-      title,
-      customerName,
-      amount: Math.abs(transaction.amount),
-      date: new Date(transaction.createdAt).toISOString().split('T')[0],
-      method,
-      status: transaction.status,
-      reference: transaction.reference,
-      description: transaction.description,
-      rawTransaction: transaction
-    };
   }
+  
+  // Handle refund transactions
+  if (transaction.type === 'REFUND') {
+    title = 'Refund Issued';
+    method = 'TAPYZE Refund';
+    
+    if (transaction.metadata && transaction.metadata.originalTransactionId) {
+      customerName = 'Refund Customer';
+    }
+  }
+  
+  // Handle special cases based on description
+  if (transaction.description) {
+    const desc = transaction.description.toLowerCase();
+    
+    if (desc.includes('top-up') || desc.includes('topup')) {
+      title = 'Wallet Top-up';
+      customerName = 'Self';
+      method = 'Direct Deposit';
+    } else if (desc.includes('refund')) {
+      title = 'Refund Issued';
+      method = 'TAPYZE Refund';
+    }
+    
+    // Extract customer name from description if still unknown
+    if (customerName === 'Unknown' || customerName === 'Card Holder') {
+      // Try to extract name from description like "Transfer from John Doe"
+      const fromMatch = desc.match(/from\s+([^,\n]+)/i);
+      const toMatch = desc.match(/to\s+([^,\n]+)/i);
+      
+      if (fromMatch && isCredit) {
+        customerName = fromMatch[1].trim();
+      } else if (toMatch && !isCredit) {
+        customerName = toMatch[1].trim();
+      }
+    }
+  }
+  
+  // Determine transaction type for merchant view
+  let transactionType = 'receive';
+  if (!isCredit || transaction.amount < 0) {
+    if (title.includes('Refund') || title.includes('Sent')) {
+      transactionType = 'refund';
+    } else {
+      transactionType = 'withdraw';
+    }
+  }
+
+  return {
+    id: transaction._id,
+    type: transactionType,
+    title,
+    customerName,
+    amount: Math.abs(transaction.amount),
+    date: new Date(transaction.createdAt).toISOString().split('T')[0],
+    method,
+    status: transaction.status || 'COMPLETED',
+    reference: transaction.reference || transaction._id,
+    description: transaction.description,
+    rawTransaction: transaction
+  };
+}
 
   // Get dashboard statistics (this was missing and causing the error)
   async getDashboardStats() {

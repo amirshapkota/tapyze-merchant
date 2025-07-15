@@ -59,14 +59,14 @@ const StatementsScreen = () => {
     try {
       if (showLoader) setIsLoading(true);
       
-      const result = await merchantWalletService.getTransactionHistory(1, 50); // Get more for better grouping
+      const result = await merchantWalletService.getTransactionHistory(1, 50);
       
       if (result.success) {
         const formattedTransactions = result.transactions.map(transaction => 
           merchantWalletService.formatTransactionForDisplay(transaction)
         );
         
-        // Group transactions by month like your original format
+        // Group transactions
         const groupedTransactions = groupTransactionsByMonth(formattedTransactions);
         setStatements(groupedTransactions);
         setFilteredStatements(groupedTransactions);
@@ -76,11 +76,9 @@ const StatementsScreen = () => {
         
       } else {
         console.error('Failed to load transactions:', result.message);
-        // Keep original sample data if API fails
       }
     } catch (error) {
       console.error('Error loading transactions:', error);
-      // Keep original sample data if API fails
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
