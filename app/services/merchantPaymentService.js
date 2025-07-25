@@ -74,10 +74,27 @@ class PaymentService {
     try {
       console.log('PaymentService API Call:', endpoint, 'for user:', this.currentUserId);
       const response = await fetch(url, config);
-      const data = await response.json();
-
+      
+      // Check if response is ok before trying to parse JSON
       if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong');
+        let errorMessage = 'Something went wrong';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // If JSON parsing fails, use status text
+          errorMessage = response.statusText || `HTTP ${response.status}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Try to parse JSON response
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', parseError);
+        throw new Error('Invalid response format from server');
       }
 
       return data;
@@ -338,6 +355,100 @@ class PaymentService {
       };
     }
   }
+
+/**
+ * Refund a transaction by transaction ID
+ * @param {string} transactionId - Original transaction ID to refund
+ * @param {string} reason - Reason for refund
+ * @returns {Promise<Object>} Refund result
+ */
+async refundTransaction(transactionId, reason = null) {
+  try {
+    console.log('PaymentService: Processing transaction refund for user:', this.currentUserId);
+    console.log('Transaction ID:', transactionId, 'Reason:', reason);
+    
+    if (!transactionId) {
+      return {
+        success: false,
+        message: 'Transaction ID is required'
+      };
+    }
+
+    // Check authentication
+    const token = await this.getToken();
+    if (!token) {
+      return {
+        success: false,
+        message: 'Authentication required. Please log in again.'
+      };
+    }
+
+    const payload = reason ? { reason } : {};
+    console.log('Refund payload:', JSON.stringify(payload, null, 2));
+
+    const response = await this.apiCall(`/payments/transactions/${transactionId}/refund`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    console.log('Refund response:', response);
+
+    if (response && response.status === 'success') {
+      return {
+        success: true,
+        data: {
+          refundTransaction: response.data?.refundTransaction,
+          refundAmount: response.data?.refundAmount,
+          customerNewBalance: response.data?.customerNewBalance,
+          merchantNewBalance: response.data?.merchantNewBalance
+        },
+        message: response.message || 'Refund processed successfully'
+      };
+    } else {
+      return {
+        success: false,
+        message: response?.message || 'Refund failed'
+      };
+    }
+  } catch (error) {
+    console.error('Transaction refund error:', error);
+    
+    // Handle specific error cases
+    if (error.message) {
+      if (error.message.includes('404') || error.message.includes('not found')) {
+        return {
+          success: false,
+          message: 'Transaction not found'
+        };
+      } else if (error.message.includes('already refunded')) {
+        return {
+          success: false,
+          message: 'Transaction has already been refunded'
+        };
+      } else if (error.message.includes('403') || error.message.includes('permission')) {
+        return {
+          success: false,
+          message: 'You do not have permission to refund this transaction'
+        };
+      } else if (error.message.includes('insufficient balance')) {
+        return {
+          success: false,
+          message: 'Insufficient balance to process refund'
+        };
+      } else if (error.message.includes('Network request failed')) {
+        return {
+          success: false,
+          message: 'Network error. Please check your connection and try again.'
+        };
+      }
+    }
+    
+    return {
+      success: false,
+      message: error.message || 'Failed to process refund. Please try again.'
+    };
+  }
+}
 
   /**
    * Get merchant's payment statistics

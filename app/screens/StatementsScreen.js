@@ -20,6 +20,8 @@ import { useMerchantAuth } from '../context/MerchantAuthContext';
 import merchantWalletService from '../services/merchantWalletService';
 import styles from '../styles/StatementsScreenStyles';
 
+import paymentService from '../services/merchantPaymentService';
+
 const StatementsScreen = () => {
   const navigation = useNavigation();
   const { user } = useMerchantAuth();
@@ -53,6 +55,10 @@ const StatementsScreen = () => {
   // NEW: Transaction details modal state
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+
+  const [isRefunding, setIsRefunding] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
 
   // Load transactions from backend
   const loadTransactions = async (showLoader = true) => {
@@ -248,6 +254,118 @@ const StatementsScreen = () => {
   const handleTransactionSelect = (transaction) => {
     setSelectedTransaction(transaction);
     setShowTransactionModal(true);
+  };
+
+  const handleRefund = async (transaction) => {
+    try {
+      setIsRefunding(true);
+      
+      console.log('Starting refund for transaction:', transaction);
+      
+      // Get the original transaction ID from metadata
+      let transactionId = null;
+      
+      // First try to get from rawTransaction
+      if (transaction.rawTransaction && transaction.rawTransaction._id) {
+        transactionId = transaction.rawTransaction._id;
+      } 
+      // Then try reference field
+      else if (transaction.reference) {
+        transactionId = transaction.reference;
+      } 
+      // Finally try the transaction id itself
+      else if (transaction.id) {
+        transactionId = transaction.id;
+      }
+      
+      console.log('Extracted transaction ID:', transactionId);
+      
+      if (!transactionId) {
+        Alert.alert('Error', 'Cannot find transaction ID for refund');
+        return;
+      }
+
+      // Validate that this is a payment that can be refunded
+      if (transaction.type !== 'receive') {
+        Alert.alert('Error', 'Only received payments can be refunded');
+        return;
+      }
+
+      const result = await paymentService.refundTransaction(transactionId, refundReason || 'Customer refund request');
+      
+      console.log('Refund result:', result);
+      
+      if (result.success) {
+        Alert.alert(
+          'Refund Successful', 
+          `Refund of Rs. ${result.data.refundAmount ? result.data.refundAmount.toFixed(2) : transaction.amount.toFixed(2)} has been processed successfully.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setShowTransactionModal(false);
+                setShowRefundModal(false);
+                setRefundReason('');
+                // Refresh the transactions list
+                loadTransactions(false);
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Refund Failed', result.message || 'Failed to process refund');
+      }
+    } catch (error) {
+      console.error('Refund error:', error);
+      Alert.alert('Error', 'An unexpected error occurred while processing the refund');
+    } finally {
+      setIsRefunding(false);
+    }
+  };
+
+  const showRefundConfirmation = (transaction) => {
+    console.log('Showing refund confirmation for:', transaction);
+    
+    // Additional validation
+    if (!transaction || transaction.type !== 'receive') {
+      Alert.alert('Error', 'This transaction cannot be refunded');
+      return;
+    }
+
+    // Check if transaction is from today or recent (optional business rule)
+    const transactionDate = new Date(transaction.rawTransaction?.createdAt || transaction.date);
+    const daysDiff = (new Date() - transactionDate) / (1000 * 60 * 60 * 24);
+    
+    if (daysDiff > 30) {
+      Alert.alert(
+        'Old Transaction',
+        'This transaction is more than 30 days old. Are you sure you want to proceed with the refund?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Proceed', onPress: () => proceedWithRefund(transaction) }
+        ]
+      );
+      return;
+    }
+    
+    proceedWithRefund(transaction);
+  };
+  const proceedWithRefund = (transaction) => {
+    Alert.alert(
+      'Confirm Refund',
+      `Are you sure you want to refund Rs. ${transaction.amount.toFixed(2)} to ${transaction.customerName}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Refund Now',
+          style: 'destructive',
+          onPress: () => handleRefund(transaction)
+        }
+      ]
+    );
   };
 
   const renderTransaction = ({ item }) => {
@@ -713,14 +831,81 @@ const StatementsScreen = () => {
                   {selectedTransaction.type === 'receive' && (
                     <TouchableOpacity 
                       style={[styles.actionButton, {backgroundColor: '#FF3B30'}]}
+                      onPress={() => showRefundConfirmation(selectedTransaction)}
+                      disabled={isRefunding}
                     >
-                      <Ionicons name="return-down-back-outline" size={20} color="#FFF" />
-                      <Text style={styles.actionButtonText}>Refund</Text>
+                      {isRefunding ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <Ionicons name="return-down-back-outline" size={20} color="#FFF" />
+                      )}
+                      <Text style={styles.actionButtonText}>
+                        {isRefunding ? 'Processing...' : 'Refund'}
+                      </Text>
                     </TouchableOpacity>
                   )}
                 </View>
               </View>
             )}
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showRefundModal}
+        onRequestClose={() => setShowRefundModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Refund Reason</Text>
+              <TouchableOpacity onPress={() => {
+                setShowRefundModal(false);
+                setRefundReason('');
+              }}>
+                <Ionicons name="close-circle" size={28} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalContent}>
+              <Text style={styles.inputLabel}>Reason for Refund (Optional)</Text>
+              <TextInput
+                style={[styles.emailInput, {height: 80, textAlignVertical: 'top'}]}
+                placeholder="Enter reason for refund..."
+                multiline={true}
+                numberOfLines={3}
+                value={refundReason}
+                onChangeText={setRefundReason}
+              />
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={styles.resetButton}
+                  onPress={() => {
+                    setShowRefundModal(false);
+                    setRefundReason('');
+                  }}
+                >
+                  <Text style={styles.resetButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.applyButton}
+                  onPress={() => {
+                    setShowRefundModal(false);
+                    handleRefund(selectedTransaction);
+                  }}
+                  disabled={isRefunding}
+                >
+                  {isRefunding ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.applyButtonText}>Process Refund</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
